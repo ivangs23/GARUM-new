@@ -68,14 +68,30 @@ export default function CategoryForm({ initial }: { initial?: Category }) {
             <option value="barra">Barra</option>
           </select>
         </label>
+      </div>
+
+      <div className="icon-selector-wrap">
+        <p className="field-label">Icono de la categoría</p>
+        <div className="icon-grid">
+          {['🍷','🥂','🍺','🍹','☕','🥐','🥪','🥩','🐟','🥗','🍰','🧀','🍳','🥘','🍟','🍕','🍦','🍽️'].map(emoji => (
+            <button
+              key={emoji}
+              type="button"
+              className={`icon-choice ${form.icon === emoji ? 'selected' : ''}`}
+              onClick={() => set('icon', emoji)}
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="form-row">
         <label>
-          Icono (nombre Lucide)
-          <input value={form.icon} onChange={e => set('icon', e.target.value)} placeholder="Wine, Utensils, Coffee..." />
-        </label>
-        <label>
-          Orden
+          Orden de aparición
           <input type="number" value={form.sort_order} onChange={e => set('sort_order', +e.target.value)} />
         </label>
+        <div style={{ flex: 2 }} />
       </div>
 
       {error && <p className="error-msg">{error}</p>}
@@ -102,7 +118,25 @@ export default function CategoryForm({ initial }: { initial?: Category }) {
           transition: border-color 0.2s;
         }
         .form-row input:focus, .form-row select:focus { border-color: var(--primary); }
-        .error-msg { color: #f87171; font-size: 0.85rem; }
+        .icon-selector-wrap { display: flex; flex-direction: column; gap: 0.8rem; }
+        .field-label { font-size: 0.85rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin: 0; }
+        .icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(50px, 1fr)); gap: 0.6rem; background: #fff; padding: 1.2rem; border-radius: 16px; border: 1px solid var(--border); }
+        .icon-choice {
+          font-size: 1.8rem;
+          padding: 0.6rem;
+          background: #fafafa;
+          border: 1px solid #eee;
+          border-radius: 12px;
+          cursor: pointer;
+          transition: all 0.2s;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .icon-choice:hover { border-color: var(--primary); background: var(--primary-light); transform: scale(1.1); }
+        .icon-choice.selected { border-color: var(--primary); background: var(--primary-light); box-shadow: 0 0 0 3px rgba(123, 29, 46, 0.1); }
+        
+        .error-msg { color: #dc2626; font-size: 0.85rem; font-weight: 500; }
         .form-actions { display: flex; gap: 1rem; }
         .btn-secondary {
           padding: 0.75rem 1.5rem;

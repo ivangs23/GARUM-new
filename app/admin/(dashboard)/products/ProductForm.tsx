@@ -83,11 +83,15 @@ export default function ProductForm({ initial, categories }: Props) {
 
     let productId = initial?.id;
 
+    // Remove relations from base data
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { product_extras, ...baseData } = form as any;
+
     if (productId) {
-      const { error } = await supabase.from('products').update(form).eq('id', productId);
+      const { error } = await supabase.from('products').update(baseData).eq('id', productId);
       if (error) { setError(error.message); setLoading(false); return; }
     } else {
-      const { data, error } = await supabase.from('products').insert(form).select('id').single();
+      const { data, error } = await supabase.from('products').insert(baseData).select('id').single();
       if (error) { setError(error.message); setLoading(false); return; }
       productId = data.id;
     }
