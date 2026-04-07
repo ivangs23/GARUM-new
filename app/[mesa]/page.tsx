@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
-import { Search, Loader2, Plus, Minus, ShoppingBag, ArrowLeft } from 'lucide-react';
+import { Search, Loader2, Plus, Minus, ShoppingBag, ArrowLeft, X } from 'lucide-react';
 import Image from 'next/image';
 import { useCart } from '@/context/CartContext';
 import { supabase } from '@/lib/supabase';
@@ -28,6 +28,7 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
   const [loading, setLoading]                 = useState(true);
   const [paying, setPaying]                   = useState(false);
   const [view, setView]                       = useState<'categories' | 'menu'>('categories');
+  const [isCartOpen, setIsCartOpen]           = useState(false);
 
   const { addItem, items, totalQuantity, totalAmount, removeItem } = useCart();
   const getQty = (id: string) => items.find(i => i.id === id)?.quantity ?? 0;
@@ -214,10 +215,10 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
                             </div>
                           )}
                           <span className="price">{Number(p.price).toFixed(2)}€</span>
-                          <div className="qty-controls" onClick={e => e.stopPropagation()}>
+                          <div className={`qty-controls ${qty === 0 ? 'empty' : 'filled'}`} onClick={e => e.stopPropagation()}>
                             {qty > 0 && (
                               <>
-                                <button className="qty-btn" onClick={() => removeItem(p.id)}><Minus size={14} /></button>
+                                <button className="qty-btn" onClick={() => removeItem(p.id)}><Minus size={16} /></button>
                                 <span className="qty-num">{qty}</span>
                               </>
                             )}
@@ -292,17 +293,71 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
 
       {/* Carrito flotante */}
       {totalQuantity > 0 && (
-        <footer className="footer-cart glass">
+        <footer className="footer-cart glass" onClick={() => setIsCartOpen(true)}>
           <div className="cart-summary">
             <div className="cart-text">
               <strong>Mi Pedido</strong>
               <p>{totalQuantity} {totalQuantity === 1 ? 'producto' : 'productos'}</p>
             </div>
-            <button className="gold-button pay-btn" onClick={handleCheckout} disabled={paying}>
-              {paying ? <Loader2 size={18} className="spin" /> : `PAGAR ${totalAmount.toFixed(2)}€`}
-            </button>
+            <div className="cart-right">
+              <span className="cart-total-mini">{totalAmount.toFixed(2)}€</span>
+              <button 
+                className="gold-button pay-btn-small" 
+                onClick={(e) => { e.stopPropagation(); handleCheckout(); }} 
+                disabled={paying}
+              >
+                {paying ? <Loader2 size={16} className="spin" /> : 'PAGAR'}
+              </button>
+            </div>
           </div>
         </footer>
+      )}
+
+      {/* Modal del Carrito Detallado */}
+      {isCartOpen && (
+        <div className="modal-overlay cart-overlay" onClick={() => setIsCartOpen(false)}>
+          <div className="modal cart-modal" onClick={e => e.stopPropagation()}>
+            <div className="cart-modal-header">
+              <h3>Pedido en curso</h3>
+              <button className="close-btn" onClick={() => setIsCartOpen(false)}><X size={20} /></button>
+            </div>
+            
+            <div className="cart-items-list">
+              {items.map(item => (
+                <div key={item.id} className="cart-item">
+                  <div className="item-details">
+                    <span className="item-name">{item.name}</span>
+                    <span className="item-price-unit">{item.price.toFixed(2)}€ / ud.</span>
+                  </div>
+                  <div className="item-actions">
+                    <div className="qty-controls filled">
+                      <button className="qty-btn" onClick={() => removeItem(item.id)}><Minus size={14} /></button>
+                      <span className="qty-num">{item.quantity}</span>
+                      <button className="add-btn" onClick={() => addItem(item)}><Plus size={14} /></button>
+                    </div>
+                    <span className="item-subtotal">{(item.price * item.quantity).toFixed(2)}€</span>
+                  </div>
+                </div>
+              ))}
+              {items.length === 0 && (
+                <div className="empty-cart-msg">
+                  <ShoppingBag size={40} color="var(--text-muted)" />
+                  <p>Tu carrito está vacío</p>
+                </div>
+              )}
+            </div>
+
+            <div className="cart-modal-footer">
+              <div className="total-row">
+                <span>TOTAL</span>
+                <span>{totalAmount.toFixed(2)}€</span>
+              </div>
+              <button className="gold-button pay-btn-full" onClick={handleCheckout} disabled={paying || items.length === 0}>
+                {paying ? <Loader2 size={18} className="spin" /> : `CONFIRMAR Y PAGAR`}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <style jsx>{`
@@ -353,24 +408,33 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
         @media (min-width: 768px) { .products-list { grid-template-columns: repeat(2, 1fr); } }
         @media (min-width: 1200px) { .products-list { grid-template-columns: repeat(3, 1fr); } }
 
-        .product-card { background:var(--surface); padding:1.2rem; border-radius:18px; border:1px solid var(--border); display:flex; flex-direction:column; justify-content:space-between; gap:1.2rem; cursor:pointer; transition:all 0.2s; box-shadow:var(--card-shadow); height:100%; position:relative; }
+        .product-card { background:#fff; padding:1.5rem; border-radius:24px; border:none; display:flex; flex-direction:column; justify-content:space-between; gap:1.2rem; cursor:pointer; transition:all 0.3s ease; box-shadow:0 12px 35px rgba(0,0,0,0.03); height:100%; position:relative; }
         .product-card:active { transform:scale(0.98); }
-        .product-card:hover { border-color:var(--primary); box-shadow:0 8px 24px rgba(123,29,46,0.08); }
+        .product-card:hover { transform:translateY(-4px); box-shadow:0 16px 40px rgba(123,29,46,0.08); }
         
-        .product-info { display:flex; flex-direction:column; gap:0.5rem; }
-        .product-info h3 { margin:0; font-size:1.15rem; color:var(--text); font-family:var(--font-playfair); font-weight:700; }
-        .product-desc { font-size:0.85rem; color:var(--text-muted); margin:0; line-height:1.5; height:3em; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
-        .allergens { display:flex; gap:0.3rem; flex-wrap:wrap; }
+        .product-info { display:flex; flex-direction:column; gap:0.4rem; }
+        .product-info h3 { margin:0; font-size:1.25rem; color:#222; font-family:var(--font-playfair); font-weight:800; }
+        .product-desc { font-size:0.85rem; color:#777; margin:0; line-height:1.5; height:3em; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+        .allergens { display:flex; gap:0.3rem; flex-wrap:wrap; margin-top:0.2rem; }
         .allergen-icon { font-size:0.9rem; }
         
-        .product-action { display:flex; align-items:flex-end; justify-content:space-between; margin-top:0.5rem; }
-        .product-img-wrap { position:absolute; top:1.2rem; right:1.2rem; width:60px; height:60px; border-radius:12px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.1); }
-        .product-info.has-img { padding-right:70px; }
+        .product-action { display:flex; align-items:center; justify-content:space-between; margin-top:0.5rem; }
+        .product-img-wrap { position:absolute; top:1.5rem; right:1.5rem; width:90px; height:90px; border-radius:18px; overflow:hidden; box-shadow:0 8px 20px rgba(0,0,0,0.08); background:#fff; padding:4px; border:1px solid rgba(0,0,0,0.03); }
+        .product-img-wrap :global(img) { border-radius:14px; }
+        .product-info.has-img { padding-right:110px; min-height: 90px; }
 
-        .qty-controls { display:flex; align-items:center; gap:0.6rem; background: #fff; padding: 0.2rem; border-radius: 30px; border: 1px solid var(--border); }
-        .qty-num { font-weight:700; min-width:16px; text-align:center; color:var(--text); }
-        .qty-btn { width:30px; height:30px; border-radius:50%; border:1px solid var(--border); background:none; color:var(--text-muted); display:flex; align-items:center; justify-content:center; cursor:pointer; }
-        .add-btn { width:32px; height:32px; border-radius:50%; border:1px solid var(--primary); background:none; color:var(--primary); display:flex; align-items:center; justify-content:center; cursor:pointer; }
+        .price { font-weight:500; color:#222; font-size:1.05rem; }
+        
+        .qty-controls { display:flex; align-items:center; justify-content:center; border-radius:30px; transition:all 0.2s; }
+        .qty-controls.filled { background:#fff; border:1px solid rgba(123,29,46,0.2); padding:0.2rem 0.4rem; gap:0.5rem; box-shadow:0 4px 10px rgba(123,29,46,0.05); }
+        .qty-controls.empty { border:none; background:transparent; padding:0; gap:0; }
+        
+        .qty-num { font-weight:800; min-width:18px; text-align:center; color:#222; font-size:1rem; }
+        
+        .qty-btn { width:34px; height:34px; border-radius:50%; border:none; background:none; color:var(--text-muted); display:flex; align-items:center; justify-content:center; cursor:pointer; }
+        .add-btn { width:38px; height:38px; border-radius:50%; border:1px solid rgba(123,29,46,0.4); background:none; color:var(--primary); display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.2s; }
+        .qty-controls.filled .add-btn { width:34px; height:34px; border:none; background:none; }
+        .qty-controls.empty .add-btn:hover { background:rgba(123,29,46,0.05); border-color:var(--primary); }
 
         .empty-search { text-align:center; padding:4rem 1rem; color:var(--text-muted); }
 
@@ -388,11 +452,34 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
         .extra-price { margin-left:auto; color:var(--primary); font-size:0.85rem; }
         .modal-add-btn { width:100%; justify-content:center; margin-top:0.5rem; }
 
-        .footer-cart { position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%); width:90%; max-width:480px; padding:1rem 1.2rem; border-radius:18px; box-shadow:0 10px 40px rgba(123,29,46,0.25); z-index:100; }
+        .footer-cart { position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%); width:90%; max-width:480px; padding:1rem 1.2rem; border-radius:18px; box-shadow:0 10px 40px rgba(123,29,46,0.25); z-index:100; cursor:pointer; }
         .cart-summary { display:flex; justify-content:space-between; align-items:center; }
         .cart-text p { font-size:0.78rem; color:var(--text-muted); margin:0; }
         .cart-text strong { font-size:0.95rem; color:var(--text); }
-        .pay-btn { display:flex; align-items:center; gap:0.5rem; min-width:140px; justify-content:center; }
+        .cart-right { display:flex; align-items:center; gap:1rem; }
+        .cart-total-mini { font-weight:800; color:var(--primary); font-size:1.1rem; }
+        .pay-btn-small { padding: 0.6rem 1.2rem; font-size: 0.8rem; letter-spacing: 0.05em; }
+
+        /* Estilos del Modal del Carrito */
+        .cart-modal { height: 80vh; max-height: 700px; display: flex; flex-direction: column; background: #fff; }
+        .cart-modal-header { padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .cart-modal-header h3 { margin: 0; font-family: var(--font-playfair); font-size: 1.3rem; }
+        .close-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; }
+        
+        .cart-items-list { flex: 1; overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 1.2rem; }
+        .cart-item { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #fafafa; padding-bottom: 1rem; }
+        .item-details { display: flex; flex-direction: column; gap: 0.2rem; }
+        .item-name { font-weight: 600; color: var(--text); font-size: 1rem; }
+        .item-price-unit { font-size: 0.8rem; color: var(--text-muted); }
+        
+        .item-actions { display: flex; align-items: center; gap: 1.2rem; }
+        .item-subtotal { font-weight: 700; color: var(--text); min-width: 60px; text-align: right; }
+
+        .empty-cart-msg { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; padding: 4rem 1rem; color: var(--text-muted); }
+        
+        .cart-modal-footer { padding: 1.5rem; border-top: 1px solid var(--border); background: #fafafa; }
+        .total-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; font-weight: 800; font-size: 1.2rem; }
+        .pay-btn-full { width: 100%; justify-content: center; padding: 1.1rem; font-size: 1rem; }
 
         .spin { animation:spin 1s linear infinite; }
         @keyframes spin { to { transform:rotate(360deg); } }
