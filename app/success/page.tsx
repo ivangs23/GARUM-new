@@ -3,12 +3,12 @@
 import { CheckCircle, ArrowLeft } from "lucide-react";
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 import { useCart } from "@/context/CartContext";
 
-export default function SuccessPage() {
+function SuccessContent() {
   const searchParams = useSearchParams();
-  const mesa = searchParams.get('mesa');
+  const mesa = searchParams.get('mesa') || '1';
   const { clearCart } = useCart();
 
   useEffect(() => {
@@ -17,21 +17,29 @@ export default function SuccessPage() {
   }, [clearCart]);
 
   return (
-    <main className="success-container">
-      <div className="success-card glass">
-        <CheckCircle className="check-icon" size={80} color="#7B1D2E" />
-        <h1 className="gold-text">¡Pedido Confirmado!</h1>
-        <p className="serif">Gracias por confiar en Garum.</p>
-        
-        <div className="details">
-          <p>Tu comanda para la <strong>Mesa {mesa}</strong> ya está en cocina.</p>
-          <p>En breve te lo serviremos.</p>
-        </div>
-
-        <Link href={`/${mesa}`} className="gold-button back-btn">
-          <ArrowLeft size={18} /> VOLVER A LA CARTA
-        </Link>
+    <div className="success-card glass">
+      <CheckCircle className="check-icon" size={80} color="#7B1D2E" />
+      <h1 className="gold-text">¡Pedido Confirmado!</h1>
+      <p className="serif">Gracias por confiar en Garum.</p>
+      
+      <div className="details">
+        <p>Tu comanda para la <strong>Mesa {mesa}</strong> ya está en cocina.</p>
+        <p>En breve te lo serviremos.</p>
       </div>
+
+      <Link href={`/${mesa}`} className="gold-button back-btn">
+        <ArrowLeft size={18} /> VOLVER A LA CARTA
+      </Link>
+    </div>
+  );
+}
+
+export default function SuccessPage() {
+  return (
+    <main className="success-container">
+      <Suspense fallback={<div>Cargando...</div>}>
+        <SuccessContent />
+      </Suspense>
 
       <style jsx>{`
         .success-container {
