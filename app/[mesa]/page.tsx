@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, use } from 'react';
-import { Search, Loader2, Plus, Minus, ShoppingBag } from 'lucide-react';
+import Link from 'next/link';
+import { Search, Loader2, Plus, Minus, ShoppingBag, ArrowLeft } from 'lucide-react';
 import Image from 'next/image';
 import { useCart } from '@/context/CartContext';
 import { supabase } from '@/lib/supabase';
@@ -26,11 +27,13 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
   const [selectedExtras, setSelectedExtras]   = useState<Extra[]>([]);
   const [loading, setLoading]                 = useState(true);
   const [paying, setPaying]                   = useState(false);
+  const [view, setView]                       = useState<'categories' | 'menu'>('categories');
 
   const { addItem, items, totalQuantity, totalAmount, removeItem } = useCart();
   const getQty = (id: string) => items.find(i => i.id === id)?.quantity ?? 0;
 
   useEffect(() => {
+    setLoading(true);
     supabase
       .from('categories')
       .select('*, products(*, product_extras(*))')
@@ -81,6 +84,14 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
     setSelectedProduct(null);
   };
 
+  const selectCategory = (slug: string) => {
+    setActiveCategory(slug);
+    setView('menu');
+    setTimeout(() => {
+      document.getElementById(slug)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  };
+
   const filteredCategories = categories.map(cat => ({
     ...cat,
     products: cat.products.filter(p =>
@@ -88,7 +99,11 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
       p.name.toLowerCase().includes(search.toLowerCase()) ||
       p.description?.toLowerCase().includes(search.toLowerCase())
     ),
-  })).filter(cat => !search || cat.products.length > 0);
+  })).filter(cat => {
+    if (search) return cat.products.length > 0;
+    // Si estamos en la vista de menú, solo mostramos la categoría activa
+    return view === 'menu' ? cat.slug === activeCategory : true;
+  });
 
   if (loading) return (
     <div className="loading-screen">
@@ -107,13 +122,13 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
       {/* Navbar */}
       <header className="navbar glass">
         <div className="navbar-content">
-          <div className="brand">
+          <Link href="/" className="brand" style={{ textDecoration: 'none' }}>
             <h1 className="gold-text">GARUM</h1>
             <small className="brand-sub serif">Vinoteca &amp; Cocina</small>
-          </div>
+          </Link>
           <div className="navbar-right">
             <span className="table-badge">MESA {mesa}</span>
-            <button className="icon-btn" onClick={() => setShowSearch(s => !s)}>
+            <button className="icon-btn" onClick={() => { setShowSearch(s => !s); if(!showSearch) setView('menu'); }}>
               <Search size={22} />
             </button>
           </div>
@@ -131,80 +146,106 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
         )}
       </header>
 
-      {/* Categorías */}
-      {!search && (
-        <nav className="category-nav">
-          {categories.map(cat => (
-            <a
-              key={cat.slug}
-              href={`#${cat.slug}`}
-              onClick={() => setActiveCategory(cat.slug)}
-              className={`category-item ${activeCategory === cat.slug ? 'active' : ''}`}
-            >
-              <span>{cat.name}</span>
-            </a>
-          ))}
-        </nav>
+      {/* VISTA 1: GRID DE CATEGORÍAS (2x2 en móvil) */}
+      {view === 'categories' && !search && (
+        <main className="categories-grid-view">
+          <div className="welcome-header">
+            <h2 className="serif">¿Qué te apetece hoy?</h2>
+            <p>Selecciona una categoría para empezar</p>
+          </div>
+          <div className="cat-grid">
+            {categories.map(cat => (
+              <div 
+                key={cat.id} 
+                className="cat-card"
+                onClick={() => selectCategory(cat.slug)}
+              >
+                <div className="cat-icon-wrap">
+                  <span className="cat-icon-lg">{cat.icon || '🍷'}</span>
+                </div>
+                <h3>{cat.name}</h3>
+                <span className="cat-count">{cat.products.length} platos</span>
+              </div>
+            ))}
+          </div>
+        </main>
       )}
 
-      {/* Carta */}
-      <main className="menu-list">
-        {filteredCategories.map(cat => (
-          <section key={cat.slug} id={cat.slug} className="section">
-            <h2 className="section-title">{cat.name}</h2>
-            <div className="products-list">
-              {cat.products.map(p => {
-                const qty = getQty(p.id);
-                return (
-                  <div key={p.id} className="product-card" onClick={() => openProduct(p)}>
-                    <div className="product-info">
-                      <h3>{p.name}</h3>
-                      <p className="product-desc">{p.description}</p>
-                      {p.allergen_ids?.length > 0 && (
-                        <div className="allergens">
-                          {p.allergen_ids.map(id => (
-                            <span key={id} className="allergen-icon">{ALLERGEN_ICONS[id]}</span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div className="product-action">
-                      {p.image_url && (
-                        <div className="product-img-wrap">
-                          <Image src={p.image_url} alt={p.name} fill style={{ objectFit: 'cover' }} />
-                        </div>
-                      )}
-                      <span className="price">{Number(p.price).toFixed(2)}€</span>
-                      <div className="qty-controls" onClick={e => e.stopPropagation()}>
-                        {qty > 0 && (
-                          <>
-                            <button className="qty-btn" onClick={() => removeItem(p.id)}><Minus size={14} /></button>
-                            <span className="qty-num">{qty}</span>
-                          </>
-                        )}
-                        <button className="add-btn" onClick={() => openProduct(p)}><Plus size={16} /></button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        ))}
+      {/* VISTA 2: LISTADO DE PRODUCTOS */}
+      {(view === 'menu' || search) && (
+        <>
+          {/* Navegación de retorno (solo si no hay búsqueda) */}
+          {!search && (
+            <nav className="category-nav">
+              <button 
+                className="category-item back-btn" 
+                onClick={() => setView('categories')}
+              >
+                <ArrowLeft size={16} /> 
+                <span>Explorar otras categorías</span>
+              </button>
+            </nav>
+          )}
 
-        {filteredCategories.length === 0 && search && (
-          <div className="empty-search">
-            <ShoppingBag size={48} color="var(--text-muted)" />
-            <p>Sin resultados para &ldquo;{search}&rdquo;</p>
-          </div>
-        )}
-        {filteredCategories.length === 0 && !search && !loading && (
-          <div className="empty-search">
-            <ShoppingBag size={48} color="var(--text-muted)" />
-            <p>La carta está vacía. Añade categorías y productos desde el panel de administración.</p>
-          </div>
-        )}
-      </main>
+          <main className="menu-list">
+            {filteredCategories.map(cat => (
+              <section key={cat.slug} id={cat.slug} className="section">
+                <h2 className="section-title">{cat.name}</h2>
+                <div className="products-list">
+                  {cat.products.map(p => {
+                    const qty = getQty(p.id);
+                    return (
+                      <div key={p.id} className="product-card" onClick={() => openProduct(p)}>
+                        <div className={`product-info ${p.image_url ? 'has-img' : ''}`}>
+                          <h3>{p.name}</h3>
+                          <p className="product-desc">{p.description}</p>
+                          {p.allergen_ids?.length > 0 && (
+                            <div className="allergens">
+                              {p.allergen_ids.map(id => (
+                                <span key={id} className="allergen-icon">{ALLERGEN_ICONS[id]}</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div className="product-action">
+                          {p.image_url && (
+                            <div className="product-img-wrap">
+                              <Image src={p.image_url} alt={p.name} fill style={{ objectFit: 'cover' }} />
+                            </div>
+                          )}
+                          <span className="price">{Number(p.price).toFixed(2)}€</span>
+                          <div className="qty-controls" onClick={e => e.stopPropagation()}>
+                            {qty > 0 && (
+                              <>
+                                <button className="qty-btn" onClick={() => removeItem(p.id)}><Minus size={14} /></button>
+                                <span className="qty-num">{qty}</span>
+                              </>
+                            )}
+                            <button className="add-btn" onClick={() => openProduct(p)}><Plus size={16} /></button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
+
+            {filteredCategories.length === 0 && search && (
+              <div className="empty-search">
+                <ShoppingBag size={48} color="var(--text-muted)" />
+                <p>Sin resultados para &ldquo;{search}&rdquo;</p>
+              </div>
+            )}
+            {filteredCategories.length === 0 && !search && !loading && (
+              <div className="empty-search">
+                <ShoppingBag size={48} color="var(--text-muted)" />
+                <p>La carta está vacía. Añade categorías y productos desde el panel de administración.</p>
+              </div>
+            )}
+          </main>
+        </>
+      )}
 
       {/* Modal de producto */}
       {selectedProduct && (
@@ -279,28 +320,54 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
         .search-bar input { flex:1; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:0.6rem 1rem; color:var(--text); font-size:0.95rem; outline:none; }
         .search-bar input:focus { border-color:var(--primary); }
 
-        .category-nav { display:flex; gap:0.6rem; padding:0.8rem 1.2rem; overflow-x:auto; scrollbar-width:none; position:sticky; top:72px; background:var(--background); z-index:90; border-bottom:1px solid var(--border); }
+        .category-nav { display:flex; gap:0.6rem; padding:0.8rem 1.2rem; overflow-x:auto; scrollbar-width:none; position:sticky; top:72px; background:var(--background); z-index:90; border-bottom:1px solid var(--border); align-items:center; }
         .category-nav::-webkit-scrollbar { display:none; }
-        .category-item { display:flex; align-items:center; gap:0.4rem; padding:0.45rem 1.1rem; background:var(--surface); border-radius:30px; border:1px solid var(--border); white-space:nowrap; color:var(--text-muted); text-decoration:none; font-size:0.85rem; transition:all 0.2s; }
+        .nav-divider { width:1px; height:24px; background:var(--border); margin:0 0.4rem; flex-shrink:0; }
+        .back-btn { background:var(--primary-light) !important; color:var(--primary) !important; }
+        
+        .category-item { display:flex; align-items:center; gap:0.4rem; padding:0.45rem 1.1rem; background:var(--surface); border-radius:30px; border:1px solid var(--border); white-space:nowrap; color:var(--text-muted); text-decoration:none; font-size:0.85rem; transition:all 0.2s; cursor:pointer; }
         .category-item.active { border-color:var(--primary); color:var(--primary); background:var(--primary-light); }
+
+        .categories-grid-view { max-width:800px; margin:0 auto; padding:2rem 1.2rem; }
+        .welcome-header { text-align:center; margin-bottom:2.5rem; }
+        .welcome-header h2 { font-size:1.8rem; margin-bottom:0.5rem; color:var(--text); }
+        .welcome-header p { color:var(--text-muted); font-size:0.95rem; }
+
+        .cat-grid { display:grid; grid-template-columns: repeat(2, 1fr); gap:1rem; }
+        @media (min-width: 640px) { .cat-grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (min-width: 1024px) { .cat-grid { grid-template-columns: repeat(4, 1fr); } }
+
+        .cat-card { background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:1.5rem 1rem; text-align:center; cursor:pointer; transition:all 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow:var(--card-shadow); display:flex; flex-direction:column; align-items:center; gap:0.75rem; }
+        .cat-card:hover { border-color:var(--primary); transform:translateY(-5px); box-shadow:0 12px 24px rgba(123,29,46,0.1); }
+        .cat-card:active { transform:scale(0.96); }
+        
+        .cat-icon-wrap { width:60px; height:60px; background:var(--primary-light); border-radius:50%; display:flex; align-items:center; justify-content:center; margin-bottom:0.2rem; }
+        .cat-icon-lg { font-size:2rem; }
+        .cat-card h3 { font-family:var(--font-playfair); font-size:1.1rem; margin:0; color:var(--text); }
+        .cat-count { font-size:0.75rem; text-transform:uppercase; color:var(--text-muted); letter-spacing:0.05em; font-weight:600; }
 
         .menu-list { max-width:800px; margin:0 auto; padding:1.5rem 1rem; }
         .section { margin-bottom:3rem; }
         .section-title { font-size:1.5rem; margin-bottom:1rem; border-left:3px solid var(--primary); padding-left:0.8rem; font-family:var(--font-playfair); }
-        .products-list { display:flex; flex-direction:column; gap:0.75rem; }
+        .products-list { display:grid; grid-template-columns: 1fr; gap:1.2rem; }
+        @media (min-width: 768px) { .products-list { grid-template-columns: repeat(2, 1fr); } }
+        @media (min-width: 1200px) { .products-list { grid-template-columns: repeat(3, 1fr); } }
 
-        .product-card { background:var(--surface); padding:1.2rem; border-radius:14px; border:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:1rem; cursor:pointer; transition:border-color 0.2s; box-shadow:var(--card-shadow); }
-        .product-card:active { transform:scale(0.99); }
-        .product-card:hover { border-color:var(--primary); }
-        .product-info { flex:1; }
-        .product-info h3 { margin:0 0 0.3rem; font-size:1.05rem; color:var(--text); }
-        .product-desc { font-size:0.82rem; color:var(--text-muted); margin:0 0 0.4rem; line-height:1.4; }
-        .allergens { display:flex; gap:0.2rem; flex-wrap:wrap; }
-        .allergen-icon { font-size:0.85rem; }
-        .product-action { display:flex; flex-direction:column; align-items:flex-end; gap:0.5rem; flex-shrink:0; }
-        .product-img-wrap { position:relative; width:70px; height:70px; border-radius:10px; overflow:hidden; }
-        .price { font-weight:700; color:var(--primary); font-size:1rem; }
-        .qty-controls { display:flex; align-items:center; gap:0.5rem; }
+        .product-card { background:var(--surface); padding:1.2rem; border-radius:18px; border:1px solid var(--border); display:flex; flex-direction:column; justify-content:space-between; gap:1.2rem; cursor:pointer; transition:all 0.2s; box-shadow:var(--card-shadow); height:100%; position:relative; }
+        .product-card:active { transform:scale(0.98); }
+        .product-card:hover { border-color:var(--primary); box-shadow:0 8px 24px rgba(123,29,46,0.08); }
+        
+        .product-info { display:flex; flex-direction:column; gap:0.5rem; }
+        .product-info h3 { margin:0; font-size:1.15rem; color:var(--text); font-family:var(--font-playfair); font-weight:700; }
+        .product-desc { font-size:0.85rem; color:var(--text-muted); margin:0; line-height:1.5; height:3em; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+        .allergens { display:flex; gap:0.3rem; flex-wrap:wrap; }
+        .allergen-icon { font-size:0.9rem; }
+        
+        .product-action { display:flex; align-items:flex-end; justify-content:space-between; margin-top:0.5rem; }
+        .product-img-wrap { position:absolute; top:1.2rem; right:1.2rem; width:60px; height:60px; border-radius:12px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.1); }
+        .product-info.has-img { padding-right:70px; }
+
+        .qty-controls { display:flex; align-items:center; gap:0.6rem; background: #fff; padding: 0.2rem; border-radius: 30px; border: 1px solid var(--border); }
         .qty-num { font-weight:700; min-width:16px; text-align:center; color:var(--text); }
         .qty-btn { width:30px; height:30px; border-radius:50%; border:1px solid var(--border); background:none; color:var(--text-muted); display:flex; align-items:center; justify-content:center; cursor:pointer; }
         .add-btn { width:32px; height:32px; border-radius:50%; border:1px solid var(--primary); background:none; color:var(--primary); display:flex; align-items:center; justify-content:center; cursor:pointer; }
