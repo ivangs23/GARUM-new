@@ -100,8 +100,9 @@ export default function AdminNav() {
           color: var(--text);
         }
         :global(.nav-link.active) {
-          background: rgba(212,175,55,0.12);
+          background: var(--primary-light);
           color: var(--primary);
+          border-right: 2px solid var(--primary);
         }
         .logout-btn {
           display: flex;

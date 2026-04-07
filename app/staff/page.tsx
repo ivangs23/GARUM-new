@@ -16,17 +16,19 @@ type Order = {
   destination: 'cocina' | 'barra' | 'all';
 };
 
-// Categorías que van a cocina vs barra — se sincroniza con la columna destination de categories
-// Si no hay match, va a ambos
-const isCocina = (itemName: string) =>
-  !['vino', 'cerveza', 'café', 'cafe', 'copa', 'cóctel', 'coctel', 'agua', 'refresco', 'infusión'].some(kw =>
-    itemName.toLowerCase().includes(kw)
-  );
-
-function filterItems(items: OrderItem[], dest: 'cocina' | 'barra') {
-  return items.filter(item =>
-    dest === 'cocina' ? isCocina(item.name) : !isCocina(item.name)
-  );
+// Función de filtrado mejorada: usa el campo destination guardado en el pedido
+// Fallback a palabras clave solo si el pedido es antiguo y no tiene destination
+function filterItems(items: any[], dest: 'cocina' | 'barra') {
+  return items.filter(item => {
+    if (item.destination) {
+      return item.destination === dest;
+    }
+    // Fallback legacy logic
+    const isCocinaLegacy = !['vino', 'cerveza', 'café', 'cafe', 'copa', 'cóctel', 'coctel', 'agua', 'refresco', 'infusión'].some(kw =>
+      item.name.toLowerCase().includes(kw)
+    );
+    return dest === 'cocina' ? isCocinaLegacy : !isCocinaLegacy;
+  });
 }
 
 function printTicket(order: Order, dest: 'cocina' | 'barra') {

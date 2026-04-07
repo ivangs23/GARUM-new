@@ -24,7 +24,7 @@ export default async function AdminDashboard() {
       <div className="admin-stats-grid">
         {stats.map(({ label, value, icon: Icon, href }) => (
           <Link key={label} href={href} className="admin-stat-card">
-            <Icon size={28} color="#7B1D2E" />
+            <Icon size={28} color="var(--primary)" />
             <div>
               <p className="admin-stat-value">{value}</p>
               <p className="admin-stat-label">{label}</p>

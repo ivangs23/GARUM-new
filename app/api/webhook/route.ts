@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import { headers } from 'next/headers';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -30,7 +30,7 @@ export async function POST(req: Request) {
     if (orderId) {
       console.log(`🔔 ¡Pago recibido! Actualizando pedido ${orderId}`);
       
-      const { error } = await supabase
+      const { error } = await supabaseAdmin
         .from('orders')
         .update({ payment_status: 'paid' })
         .eq('id', orderId);

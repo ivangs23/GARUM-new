@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-01-27-acacia' as any,
@@ -13,7 +13,7 @@ export async function POST(req: Request) {
     // 1. Crear el pedido en Supabase como PENDIENTE
     const total = items.reduce((acc: number, item: any) => acc + (item.price * item.quantity), 0);
     
-    const { data: order, error: orderError } = await supabase
+    const { data: order, error: orderError } = await supabaseAdmin
       .from('orders')
       .insert([
         { 

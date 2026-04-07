@@ -7,6 +7,7 @@ type CartItem = {
   name: string;
   price: number;
   quantity: number;
+  destination?: 'cocina' | 'barra';
 };
 
 type CartContextType = {

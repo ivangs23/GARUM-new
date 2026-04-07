@@ -12,8 +12,8 @@ const ALLERGEN_ICONS: Record<number, string> = {
 };
 
 type Extra   = { id: string; name: string; price: number };
-type Product = { id: string; name: string; description: string; price: number; image_url: string | null; allergen_ids: number[]; product_extras: Extra[] };
-type Category = { id: string; name: string; slug: string; icon: string; products: Product[] };
+type Product = { id: string; name: string; description: string; price: number; image_url: string | null; allergen_ids: number[]; product_extras: Extra[]; destination?: 'cocina' | 'barra' };
+type Category = { id: string; name: string; slug: string; icon: string; destination: 'cocina' | 'barra'; products: Product[] };
 
 export default function MesaPage({ params }: { params: Promise<{ mesa: string }> }) {
   const { mesa } = use(params);
@@ -37,7 +37,11 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
       .order('sort_order')
       .then(({ data }) => {
         if (data?.length) {
-          setCategories(data as Category[]);
+          const enriched = (data as any[]).map(cat => ({
+            ...cat,
+            products: cat.products.map((p: any) => ({ ...p, destination: cat.destination }))
+          }));
+          setCategories(enriched as Category[]);
           setActiveCategory(data[0].slug);
         }
         setLoading(false);
@@ -72,6 +76,7 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
       id: selectedProduct.id + (selectedExtras.length ? '_' + selectedExtras.map(e => e.id).join('_') : ''),
       name: selectedProduct.name + (selectedExtras.length ? ` (${selectedExtras.map(e => e.name).join(', ')})` : ''),
       price: Number(selectedProduct.price) + extra,
+      destination: selectedProduct.destination
     });
     setSelectedProduct(null);
   };
