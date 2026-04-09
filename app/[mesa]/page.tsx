@@ -383,7 +383,7 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
         .category-nav { display:flex; gap:0.6rem; padding:0.8rem 1.2rem; overflow-x:auto; scrollbar-width:none; position:sticky; top:72px; background:var(--background); background-image:url('/pattern.svg'); background-size:260px 260px; z-index:90; border-bottom:1px solid var(--border); align-items:center; }
         .category-nav::-webkit-scrollbar { display:none; }
         .nav-divider { width:1px; height:24px; background:var(--border); margin:0 0.4rem; flex-shrink:0; }
-        .back-btn { background:var(--primary-light) !important; color:var(--primary) !important; }
+        .back-btn { background:#fff !important; color:var(--primary) !important; border-color:var(--primary) !important; box-shadow:0 2px 8px rgba(0,0,0,0.08); }
         
         .category-item { display:flex; align-items:center; gap:0.4rem; padding:0.45rem 1.1rem; background:var(--surface); border-radius:30px; border:1px solid var(--border); white-space:nowrap; color:var(--text-muted); text-decoration:none; font-size:0.85rem; transition:all 0.2s; cursor:pointer; }
         .category-item.active { border-color:var(--primary); color:var(--primary); background:var(--primary-light); }
