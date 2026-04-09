@@ -24,7 +24,7 @@ export default function AdminNav() {
   return (
     <nav className="admin-nav glass">
       <div className="nav-logo">
-        <span className="gold-text">GARUM</span>
+        <img src="/Logo%20garum.png" alt="Garum Vinoteca" className="nav-logo-img" />
         <small>Admin</small>
       </div>
 
@@ -75,13 +75,11 @@ export default function AdminNav() {
           flex-direction: column;
           gap: 0.2rem;
         }
-        .nav-logo span {
+        .nav-logo-img {
+          width: 130px;
+          height: auto;
           display: block;
-          font-size: 1.8rem;
-          font-weight: 900;
-          letter-spacing: 0.15em;
-          font-family: var(--font-playfair);
-          color: var(--primary);
+          margin: 0 auto;
         }
         .nav-logo small {
           color: var(--text-muted);

@@ -236,7 +236,7 @@ export default function QRGeneratorPage() {
           font-weight: 900;
           letter-spacing: 0.1em;
           margin: 0;
-          color: #7B1D2E !important;
+          color: #7B4F96 !important;
         }
 
         .qr-sub {
@@ -263,7 +263,7 @@ export default function QRGeneratorPage() {
           font-size: 1.4rem;
           font-weight: 900;
           color: white;
-          background: #7B1D2E;
+          background: #7B4F96;
           padding: 0.2rem 1rem;
           border-radius: 8px;
         }

@@ -17,18 +17,19 @@ Sistema de pedidos mediante QR con pago online integrado (Stripe) y gestión de 
 
 ## Identidad Visual
 
-- **Modo:** Light — blanco cálido + burdeos, inspirado en la fachada del local (blanco arriba, zócalo burdeos).
+- **Modo:** Light — fondo verde claro (hojas del logo) + lila uva como color principal. Áreas con logo en blanco.
 - **Paleta (variables CSS en `globals.css`):**
   | Variable | Valor | Uso |
   |---|---|---|
-  | `--background` | `#F7F3EE` | Fondo general |
-  | `--surface` | `#FFFFFF` | Tarjetas |
-  | `--primary` | `#7B1D2E` | Burdeos — botones, acentos |
-  | `--primary-hover` | `#9B2438` | Hover de botones |
-  | `--primary-light` | `rgba(123,29,46,0.08)` | Fondos suaves |
-  | `--text` | `#1A0F0A` | Texto principal |
-  | `--text-muted` | `#7A6056` | Texto secundario |
-  | `--border` | `rgba(123,29,46,0.15)` | Bordes |
+  | `--background` | `#D6E8D2` | Fondo general — verde claro de las hojas del logo |
+  | `--surface` | `#FFFFFF` | Blanco — áreas/tarjetas donde aparece el logo |
+  | `--primary` | `#7B4F96` | Lila de la uva del logo — botones, acentos |
+  | `--primary-hover` | `#9060B0` | Hover de botones |
+  | `--primary-light` | `rgba(123,79,150,0.08)` | Fondos suaves |
+  | `--secondary` | `#4A7860` | Verde salvia oscuro — apoyo tipográfico |
+  | `--text` | `#111111` | Texto principal |
+  | `--text-muted` | `#5A6E5E` | Texto secundario |
+  | `--border` | `rgba(123,79,150,0.18)` | Bordes |
 - **Admin y Staff:** fondo oscuro `#0a0a0a` — mejor legibilidad en cocina. Sus estilos están en `app/admin/admin.css`.
 - **Tipografía:** Playfair Display (`--font-playfair`, títulos) + Inter (`--font-inter`, UI).
 - **Clases utilitarias globales:** `.glass`, `.gold-text`, `.gold-button`, `.serif`.

@@ -23,7 +23,7 @@ export default function StaffLoginPage() {
     <div className="login-container">
       <div className="login-card glass">
         <div className="login-header">
-          <h1 className="gold-text">GARUM</h1>
+          <img src="/Logo%20garum.png" alt="Garum Vinoteca" className="login-logo" />
           <p>Panel de Staff</p>
         </div>
         <form onSubmit={handleLogin} className="login-form">
@@ -45,7 +45,7 @@ export default function StaffLoginPage() {
         .login-container { min-height:100vh; display:flex; align-items:center; justify-content:center; background:var(--background); padding:2rem; }
         .login-card { width:100%; max-width:380px; padding:2.5rem; border-radius:20px; border:1px solid var(--border); }
         .login-header { text-align:center; margin-bottom:2rem; }
-        .login-header h1 { font-size:2rem; margin:0 0 0.3rem; }
+        .login-logo { width:150px; height:auto; display:block; margin:0 auto 0.4rem; }
         .login-header p { color:var(--text-muted); font-size:0.9rem; }
         .login-form { display:flex; flex-direction:column; gap:1rem; }
         .field { position:relative; display:flex; align-items:center; }

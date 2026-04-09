@@ -42,11 +42,13 @@ export default async function CategoriesPage() {
                   </span>
                 </td>
                 <td className="muted">{cat.sort_order}</td>
-                <td className="admin-actions">
-                  <Link href={`/admin/categories/${cat.id}`} className="admin-action-btn">
-                    <Pencil size={15} />
-                  </Link>
-                  <DeleteCategoryButton id={cat.id} />
+                <td>
+                  <div className="admin-actions">
+                    <Link href={`/admin/categories/${cat.id}`} className="admin-action-btn">
+                      <Pencil size={15} />
+                    </Link>
+                    <DeleteCategoryButton id={cat.id} />
+                  </div>
                 </td>
               </tr>
             ))}

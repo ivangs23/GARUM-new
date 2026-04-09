@@ -36,7 +36,7 @@ export default function AdminLoginPage() {
 
       <div className="login-card">
         <div className="login-header">
-          <h1 className="gold-text">GARUM</h1>
+          <img src="/Logo%20garum.png" alt="Garum Vinoteca" className="login-logo" />
           <p className="subtitle serif">Panel de Administración</p>
         </div>
 
@@ -121,12 +121,11 @@ export default function AdminLoginPage() {
           text-align: center;
           margin-bottom: 2.5rem;
         }
-        .login-header h1 {
-          font-size: 2.8rem;
-          margin: 0 0 0.3rem;
-          letter-spacing: 0.15em;
-          color: var(--primary);
-          font-family: var(--font-playfair);
+        .login-logo {
+          width: 160px;
+          height: auto;
+          display: block;
+          margin: 0 auto 0.6rem;
         }
         .subtitle {
           color: var(--text-muted);
@@ -212,7 +211,7 @@ export default function AdminLoginPage() {
         .login-btn:hover {
           background: var(--primary-hover);
           transform: translateY(-2px);
-          box-shadow: 0 8px 25px rgba(123, 29, 46, 0.3);
+          box-shadow: 0 8px 25px rgba(123, 79, 150, 0.3);
         }
 
         .spin {

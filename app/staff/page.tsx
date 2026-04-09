@@ -127,7 +127,7 @@ export default function StaffPage() {
     <main className="staff-container">
       <header className="staff-header glass">
         <div className="header-left">
-          <h1 className="gold-text">GARUM</h1>
+          <img src="/Logo%20garum.png" alt="Garum Vinoteca" className="staff-logo" />
           <span className="header-sub">Panel de Comandas</span>
         </div>
         <div className="header-right">
@@ -191,8 +191,8 @@ export default function StaffPage() {
         .staff-container { min-height:100vh; background:#0a0a0a; color:var(--text); }
 
         .staff-header { display:flex; justify-content:space-between; align-items:center; padding:1rem 2rem; border-bottom:1px solid var(--border); position:sticky; top:0; z-index:10; background:#111; }
-        .header-left { display:flex; align-items:baseline; gap:0.8rem; }
-        .header-left h1 { font-size:1.6rem; margin:0; letter-spacing:0.1em; }
+        .header-left { display:flex; align-items:center; gap:0.8rem; }
+        .staff-logo { height:36px; width:auto; display:block; }
         .header-sub { font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.1em; }
         .header-right { display:flex; align-items:center; gap:1rem; }
         .live-badge { display:flex; align-items:center; gap:0.5rem; font-size:0.7rem; color:#4ade80; letter-spacing:0.1em; }

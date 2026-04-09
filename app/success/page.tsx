@@ -18,7 +18,7 @@ function SuccessContent() {
 
   return (
     <div className="success-card glass">
-      <CheckCircle className="check-icon" size={80} color="#7B1D2E" />
+      <CheckCircle className="check-icon" size={80} color="#7B4F96" />
       <h1 className="gold-text">¡Pedido Confirmado!</h1>
       <p className="serif">Gracias por confiar en Garum.</p>
       

@@ -134,7 +134,7 @@ export default function CategoryForm({ initial }: { initial?: Category }) {
           justify-content: center;
         }
         .icon-choice:hover { border-color: var(--primary); background: var(--primary-light); transform: scale(1.1); }
-        .icon-choice.selected { border-color: var(--primary); background: var(--primary-light); box-shadow: 0 0 0 3px rgba(123, 29, 46, 0.1); }
+        .icon-choice.selected { border-color: var(--primary); background: var(--primary-light); box-shadow: 0 0 0 3px rgba(123, 79, 150, 0.1); }
         
         .error-msg { color: #dc2626; font-size: 0.85rem; font-weight: 500; }
         .form-actions { display: flex; gap: 1rem; }

@@ -14,17 +14,8 @@ export default function DeleteProductButton({ id }: { id: string }) {
   };
 
   return (
-    <button onClick={handleDelete} className="del-btn">
+    <button onClick={handleDelete} className="admin-action-btn delete">
       <Trash2 size={15} />
-      <style jsx>{`
-        .del-btn {
-          display: flex; align-items: center; justify-content: center;
-          width: 32px; height: 32px; border-radius: 8px;
-          background: var(--surface); border: 1px solid var(--border);
-          color: var(--text-muted); cursor: pointer; transition: all 0.2s;
-        }
-        .del-btn:hover { border-color: #f87171; color: #f87171; }
-      `}</style>
     </button>
   );
 }

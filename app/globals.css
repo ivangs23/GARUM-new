@@ -1,34 +1,35 @@
 :root {
   /* ── Paleta Garum Vinoteca ── */
-  /* Blanco cálido del edificio */
-  --background: #F7F3EE;
-  --surface: #FFFFFF;
-  --surface-hover: #F0EAE2;
 
-  /* Burdeos del zócalo y rótulo */
-  --primary: #7B1D2E;
-  --primary-hover: #9B2438;
-  --primary-light: rgba(123, 29, 46, 0.08);
+  /* Verde claro de las hojas del logo — fondo general de la app */
+  --background: #D6E8D2;
+  --surface:    #FFFFFF;   /* blanco — áreas con el logo */
+  --surface-hover: #F0F7EE;
 
-  /* Apoyo oscuro */
-  --secondary: #2C1810;
+  /* Lila de la uva del logo */
+  --primary:       #7B4F96;
+  --primary-hover: #9060B0;
+  --primary-light: rgba(123, 79, 150, 0.08);
+
+  /* Verde salvia oscuro — apoyo tipográfico */
+  --secondary: #4A7860;
 
   /* Tipografía */
-  --text: #1A0F0A;
-  --text-muted: #7A6056;
+  --text:          #111111;
+  --text-muted:    #5A6E5E;
   --text-on-primary: #FFFFFF;
 
   /* Bordes */
-  --border: rgba(123, 29, 46, 0.15);
-  --border-focus: rgba(123, 29, 46, 0.4);
+  --border:       rgba(123, 79, 150, 0.18);
+  --border-focus: rgba(123, 79, 150, 0.45);
 
   /* Sombras */
-  --card-shadow: 0 2px 16px rgba(44, 24, 16, 0.08);
-  --accent-shadow: 0 4px 20px rgba(123, 29, 46, 0.18);
+  --card-shadow:   0 2px 16px rgba(0, 0, 0, 0.07);
+  --accent-shadow: 0 4px 20px rgba(123, 79, 150, 0.20);
 
   /* Fuentes */
   --font-serif: var(--font-playfair), serif;
-  --font-sans: var(--font-inter), sans-serif;
+  --font-sans:  var(--font-inter), sans-serif;
 }
 
 * {
@@ -65,25 +66,21 @@ a {
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: var(--background); }
-::-webkit-scrollbar-thumb { background: rgba(123,29,46,0.25); border-radius: 10px; }
+::-webkit-scrollbar-thumb { background: rgba(123, 79, 150, 0.3); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--primary); }
 
-/* ── Glassmorphism – sobre fondos claros ── */
+/* ── Glassmorphism ── */
 .glass {
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.90);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(123, 29, 46, 0.12);
+  border: 1px solid rgba(123, 79, 150, 0.12);
   box-shadow: var(--card-shadow);
 }
 
-/* ── Texto de marca en burdeos ── */
+/* ── Texto de marca ── */
 .gold-text {
   color: var(--primary);
-  background: linear-gradient(135deg, #7B1D2E 0%, #C0384F 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
 }
 
 /* ── Botón principal ── */
@@ -105,7 +102,7 @@ a {
 .gold-button:hover:not(:disabled) {
   background: var(--primary-hover);
   transform: translateY(-2px);
-  box-shadow: 0 6px 24px rgba(123, 29, 46, 0.3);
+  box-shadow: 0 6px 24px rgba(123, 79, 150, 0.35);
 }
 
 .gold-button:disabled {

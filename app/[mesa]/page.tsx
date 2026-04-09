@@ -124,8 +124,7 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
       <header className="navbar glass">
         <div className="navbar-content">
           <Link href="/" className="brand" style={{ textDecoration: 'none' }}>
-            <h1 className="gold-text">GARUM</h1>
-            <small className="brand-sub serif">Vinoteca &amp; Cocina</small>
+            <img src="/Logo%20garum.png" alt="Garum Vinoteca" className="nav-logo-img" />
           </Link>
           <div className="navbar-right">
             <span className="table-badge">MESA {mesa}</span>
@@ -365,9 +364,9 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
 
         .navbar { position:fixed; top:0; left:0; width:100%; z-index:100; border-bottom:1px solid var(--border); }
         .navbar-content { display:flex; justify-content:space-between; align-items:center; padding:1rem 1.2rem; max-width:800px; margin:0 auto; }
-        .brand { display:flex; flex-direction:column; }
+        .brand { display:flex; align-items:center; }
+        .nav-logo-img { height:36px; width:auto; display:block; }
         .brand h1 { font-size:1.6rem; margin:0; letter-spacing:0.12em; }
-        .brand-sub { font-size:0.65rem; color:var(--text-muted); letter-spacing:0.2em; text-transform:uppercase; }
         .navbar-right { display:flex; align-items:center; gap:0.8rem; }
         .table-badge { font-size:0.65rem; background:var(--primary); color:#fff; padding:0.2rem 0.6rem; border-radius:4px; font-weight:800; letter-spacing:0.08em; }
         .icon-btn { background:none; border:none; color:var(--text); cursor:pointer; display:flex; }

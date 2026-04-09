@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from '@/lib/supabase-server';
+export const dynamic = 'force-dynamic';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Plus, Pencil } from 'lucide-react';
@@ -53,11 +54,13 @@ export default async function ProductsPage() {
                     {p.is_available ? 'Sí' : 'No'}
                   </span>
                 </td>
-                <td className="admin-actions">
-                  <Link href={`/admin/products/${p.id}`} className="admin-action-btn">
-                    <Pencil size={15} />
-                  </Link>
-                  <DeleteProductButton id={p.id} />
+                <td>
+                  <div className="admin-actions">
+                    <Link href={`/admin/products/${p.id}`} className="admin-action-btn">
+                      <Pencil size={15} />
+                    </Link>
+                    <DeleteProductButton id={p.id} />
+                  </div>
                 </td>
               </tr>
             ))}

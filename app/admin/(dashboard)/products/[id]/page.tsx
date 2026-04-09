@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from '@/lib/supabase-server';
+export const dynamic = 'force-dynamic';
 import { notFound } from 'next/navigation';
 import ProductForm from '../ProductForm';
 

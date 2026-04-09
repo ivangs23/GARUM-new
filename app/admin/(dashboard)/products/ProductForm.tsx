@@ -64,8 +64,8 @@ export default function ProductForm({ initial, categories }: Props) {
     setUploading(true);
     const ext = file.name.split('.').pop();
     const path = `${Date.now()}.${ext}`;
-    const { error, data } = await supabase.storage.from('products').upload(path, file, { upsert: true });
-    if (error) { setError('Error subiendo imagen'); setUploading(false); return; }
+    const { error, data } = await supabase.storage.from('products').upload(path, file);
+    if (error) { setError(`Error subiendo imagen: ${error.message}`); setUploading(false); return; }
     const { data: { publicUrl } } = supabase.storage.from('products').getPublicUrl(data.path);
     set('image_url', publicUrl);
     setUploading(false);
@@ -104,8 +104,10 @@ export default function ProductForm({ initial, categories }: Props) {
       );
     }
 
-    router.push('/admin/products');
     router.refresh();
+    setTimeout(() => {
+      router.push('/admin/products');
+    }, 50);
   };
 
   return (

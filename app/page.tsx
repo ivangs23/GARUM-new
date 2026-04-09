@@ -24,23 +24,22 @@ export default function Home() {
   return (
     <main className="main-container">
 
-      {/* Franja burdeos decorativa superior */}
+      {/* Franja verde salvia superior — evoca las paredes del local */}
       <div className="top-band" />
 
       <header className="header">
         <div className="logo-wrap" onClick={handleLogoClick} style={{ cursor: 'default' }}>
-          <h1 className="brand-title gold-text">GARUM</h1>
-          <p className="brand-sub serif">Vinoteca &amp; Cocina</p>
+          <img src="/Logo%20garum.png" alt="Garum Vinoteca" className="brand-logo" />
         </div>
         <div className="divider" />
       </header>
 
       <section className="hero">
         <h2 className="hero-title serif">
-          Una experiencia <span className="gold-text">exclusiva</span> en tu mesa.
+          Una experiencia <em>única</em> en tu mesa.
         </h2>
         <p className="hero-subtitle">
-          Escanea el código QR de tu mesa y comienza a disfrutar de la mejor selección de vinos, tapas y café de especialidad.
+          Escanea el código QR de tu mesa y disfruta de nuestra selección de vinos, tapas y café de especialidad.
         </p>
         <Link href="/1" className="gold-button hero-cta">
           VER CARTA COMPLETA
@@ -49,13 +48,13 @@ export default function Home() {
 
       <div className="features-grid">
         {[
-          { Icon: Wine,     title: 'Cava Seleccionada',  desc: 'Los mejores caldos de nuestra región y el mundo elegidos con mimo.' },
-          { Icon: Utensils, title: 'Tapas Gourmet',      desc: 'Gastronomía de autor diseñada para compartir momentos únicos.' },
-          { Icon: Coffee,   title: 'Café de Especialidad', desc: 'Tostado maestro preparado por baristas expertos.' },
+          { Icon: Wine,     title: 'Vinos Seleccionados', desc: 'Los mejores caldos de nuestra región y el mundo, elegidos con mimo.' },
+          { Icon: Utensils, title: 'Tapas Gourmet',       desc: 'Gastronomía de autor diseñada para compartir momentos únicos.' },
+          { Icon: Coffee,   title: 'Café de Especialidad',desc: 'Tostado maestro preparado por baristas expertos.' },
         ].map(({ Icon, title, desc }) => (
           <div key={title} className="feature-card">
             <div className="feature-icon-wrap">
-              <Icon size={28} color="#7B1D2E" />
+              <Icon size={26} strokeWidth={1.5} color="#7B4F96" />
             </div>
             <h3 className="serif">{title}</h3>
             <p>{desc}</p>
@@ -63,8 +62,10 @@ export default function Home() {
         ))}
       </div>
 
-      {/* Franja burdeos decorativa inferior */}
-      <div className="bottom-band" />
+      {/* Pie — banda verde que evoca el suelo del local */}
+      <footer className="site-footer">
+        <span className="serif footer-name">Garum Vinoteca</span>
+      </footer>
 
       <style jsx>{`
         .main-container {
@@ -74,66 +75,60 @@ export default function Home() {
           align-items: center;
           background: var(--background);
           position: relative;
-          overflow: hidden;
         }
 
-        /* Bandas burdeos que imitan el zócalo del edificio */
+        /* Banda lila superior */
         .top-band {
           width: 100%;
-          height: 6px;
+          height: 5px;
           background: var(--primary);
-        }
-        .bottom-band {
-          width: 100%;
-          height: 60px;
-          background: var(--primary);
-          margin-top: auto;
         }
 
+        /* Header con el logo — fondo blanco */
         .header {
           text-align: center;
-          padding: 3rem 2rem 2rem;
+          padding: 3rem 2rem 2.5rem;
           width: 100%;
-          max-width: 600px;
+          background: var(--surface);
+          box-shadow: 0 2px 12px rgba(0,0,0,0.06);
         }
-        .logo-wrap { margin-bottom: 1rem; }
-        .brand-title {
-          font-size: 3.5rem;
-          letter-spacing: 0.18em;
-          line-height: 1;
-          margin: 0;
-        }
-        .brand-sub {
-          font-size: 0.85rem;
-          color: var(--text-muted);
-          letter-spacing: 0.25em;
-          text-transform: uppercase;
-          margin-top: 0.4rem;
+        .logo-wrap { margin-bottom: 0; }
+        .brand-logo {
+          width: 200px;
+          height: auto;
+          display: block;
+          margin: 0 auto;
         }
         .divider {
-          width: 60px;
-          height: 2px;
+          width: 50px;
+          height: 1px;
           background: var(--primary);
-          margin: 1.5rem auto 0;
+          margin: 1.6rem auto 0;
+          opacity: 0.4;
         }
 
         .hero {
           text-align: center;
           max-width: 680px;
-          padding: 3rem 2rem;
+          padding: 3rem 2rem 2rem;
         }
         .hero-title {
-          font-size: 2.4rem;
-          line-height: 1.2;
+          font-size: 2.2rem;
+          line-height: 1.25;
           margin-bottom: 1.2rem;
           color: var(--text);
+          font-weight: 700;
+        }
+        .hero-title em {
+          font-style: italic;
+          color: var(--primary);
         }
         .hero-subtitle {
-          font-size: 1.05rem;
+          font-size: 1rem;
           color: var(--text-muted);
-          line-height: 1.7;
+          line-height: 1.75;
           margin-bottom: 2.5rem;
-          max-width: 480px;
+          max-width: 440px;
           margin-left: auto;
           margin-right: auto;
         }
@@ -141,22 +136,23 @@ export default function Home() {
           display: inline-flex;
           align-items: center;
           gap: 0.5rem;
-          font-size: 0.85rem;
-          letter-spacing: 0.1em;
+          font-size: 0.8rem;
+          letter-spacing: 0.12em;
+          border-radius: 4px;
         }
 
         .features-grid {
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-          gap: 1.5rem;
+          gap: 1.2rem;
           width: 100%;
-          max-width: 960px;
-          padding: 0 2rem 4rem;
+          max-width: 900px;
+          padding: 1rem 2rem 5rem;
         }
         .feature-card {
           background: var(--surface);
-          padding: 2rem;
-          border-radius: 8px;
+          padding: 2rem 1.6rem;
+          border-radius: 10px;
           border: 1px solid var(--border);
           text-align: center;
           box-shadow: var(--card-shadow);
@@ -176,22 +172,38 @@ export default function Home() {
           align-items: center;
           justify-content: center;
           margin: 0 auto 1.2rem;
-          border: 1px solid rgba(123,29,46,0.15);
+          border: 1px solid var(--border);
         }
         .feature-card h3 {
-          font-size: 1.1rem;
+          font-size: 1rem;
           margin-bottom: 0.6rem;
           color: var(--text);
+          letter-spacing: 0.02em;
         }
         .feature-card p {
-          font-size: 0.88rem;
+          font-size: 0.85rem;
           color: var(--text-muted);
-          line-height: 1.6;
+          line-height: 1.65;
+        }
+
+        /* Pie */
+        .site-footer {
+          margin-top: auto;
+          width: 100%;
+          background: var(--primary);
+          padding: 1.4rem 2rem;
+          text-align: center;
+        }
+        .footer-name {
+          color: rgba(255,255,255,0.85);
+          font-size: 0.95rem;
+          letter-spacing: 0.2em;
+          text-transform: uppercase;
         }
 
         @media (max-width: 600px) {
-          .brand-title { font-size: 2.8rem; }
-          .hero-title { font-size: 1.8rem; }
+          .brand-logo { width: 180px; }
+          .hero-title { font-size: 1.75rem; }
         }
       `}</style>
     </main>

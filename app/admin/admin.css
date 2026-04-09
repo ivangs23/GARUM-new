@@ -38,7 +38,7 @@
 .admin-stat-card:hover {
   border-color: var(--primary);
   transform: translateY(-4px);
-  box-shadow: 0 12px 30px rgba(123, 29, 46, 0.12);
+  box-shadow: 0 12px 30px rgba(123, 79, 150, 0.12);
 }
 
 .admin-stat-value {
@@ -120,7 +120,7 @@
 .admin-badge.unavailable { background: #fef2f2; color: #dc2626; border: 1px solid #fee2e2; }
 
 /* Actions */
-.admin-actions { display: flex; gap: 0.6rem; justify-content: flex-end; }
+.admin-actions { display: flex; gap: 0.6rem; justify-content: flex-end; align-items: center; }
 .admin-action-btn {
   display: flex;
   align-items: center;
@@ -172,8 +172,8 @@
   box-shadow: var(--accent-shadow);
 }
 
-.admin-btn-sm:hover { 
+.admin-btn-sm:hover {
   background: var(--primary-hover);
   transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(123, 29, 46, 0.3);
+  box-shadow: 0 8px 25px rgba(123, 79, 150, 0.3);
 }
