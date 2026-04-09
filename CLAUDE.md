@@ -42,7 +42,7 @@ Sistema de pedidos mediante QR con pago online integrado (Stripe) y gestión de 
 |---|---|
 | Framework | Next.js 16.2.2 — App Router |
 | Base de datos | Supabase (PostgreSQL + Auth + Realtime + Storage) |
-| Pagos | Stripe Checkout Sessions — API `2025-01-27-acacia` |
+| Pagos | Stripe Checkout Sessions — API `2026-03-25.dahlia` |
 | Estilos | CSS global `globals.css` + `admin.css` + `<style jsx>` (solo en Client Components) |
 | Auth | Supabase SSR (`@supabase/ssr`) con cookies — NO localStorage para sesiones de admin/staff |
 
