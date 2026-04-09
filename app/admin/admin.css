@@ -1,3 +1,59 @@
+/* ── Admin Layout ── */
+.admin-layout {
+  display: flex;
+  min-height: 100vh;
+  background: var(--background);
+  color: var(--text);
+}
+.admin-main {
+  flex: 1;
+  padding: 2rem;
+  overflow-y: auto;
+  min-width: 0;
+}
+
+/* Top bar — oculto en escritorio */
+.admin-topbar { display: none; }
+
+/* Overlay del drawer */
+.admin-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  z-index: 200;
+}
+
+@media (max-width: 768px) {
+  .admin-layout { flex-direction: column; }
+  .admin-main   { padding: 1.2rem; padding-top: calc(58px + 1.2rem); }
+
+  .admin-overlay { display: block; }
+
+  .admin-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.6rem 1rem;
+    background: #fff;
+    border-bottom: 1px solid var(--border);
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 198;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .admin-topbar-logo { height: 36px; width: auto; }
+  .admin-hamburger {
+    width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    color: var(--text);
+  }
+}
+
 /* ── Admin Dashboard – PREMIUM LIGHT THEME ── */
 .admin-page-title {
   font-size: 2.4rem;
@@ -64,8 +120,21 @@
   border-radius: 20px;
   border: 1px solid var(--border);
   box-shadow: var(--card-shadow);
-  overflow: hidden;
+  overflow-x: auto;
   margin-top: 1rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .admin-page-title { font-size: 1.6rem; }
+  .admin-page-header { flex-direction: column; align-items: flex-start; gap: 1rem; }
+  .admin-stats-grid { grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .admin-stat-card { padding: 1.2rem; border-radius: 14px; }
+  .admin-stat-value { font-size: 1.8rem; }
+  .admin-table { font-size: 0.85rem; min-width: 500px; }
+  .admin-table th, .admin-table td { padding: 0.8rem; }
+  .admin-btn-sm { padding: 0.65rem 1rem; font-size: 0.8rem; }
 }
 
 .admin-table {

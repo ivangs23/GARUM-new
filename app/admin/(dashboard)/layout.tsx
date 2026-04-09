@@ -1,11 +1,31 @@
+"use client";
+
+import { useState } from 'react';
+import { Menu } from 'lucide-react';
 import AdminNav from './AdminNav';
 import '../admin.css';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--background)', color: 'var(--text)' }}>
-      <AdminNav />
-      <main style={{ flex: 1, padding: '2rem', overflowY: 'auto' }}>{children}</main>
+    <div className="admin-layout">
+      {/* Top bar — solo visible en móvil */}
+      <div className="admin-topbar">
+        <button className="admin-hamburger" onClick={() => setOpen(true)} aria-label="Abrir menú">
+          <Menu size={22} />
+        </button>
+        <img src="/Logo%20garum.png" alt="Garum Vinoteca" className="admin-topbar-logo" />
+        <div style={{ width: 40 }} />
+      </div>
+
+      {/* Overlay */}
+      {open && <div className="admin-overlay" onClick={() => setOpen(false)} />}
+
+      {/* Sidebar */}
+      <AdminNav open={open} onClose={() => setOpen(false)} />
+
+      <main className="admin-main">{children}</main>
     </div>
   );
 }
