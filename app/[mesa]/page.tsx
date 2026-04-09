@@ -110,7 +110,7 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
     <div className="loading-screen">
       <Loader2 size={40} className="spin" />
       <style jsx>{`
-        .loading-screen { min-height:100vh; display:flex; align-items:center; justify-content:center; background:var(--background); }
+        .loading-screen { min-height:100vh; display:flex; align-items:center; justify-content:center; background:transparent; }
         .spin { animation:spin 1s linear infinite; color:var(--primary); }
         @keyframes spin { to { transform:rotate(360deg); } }
       `}</style>
@@ -360,12 +360,18 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
       )}
 
       <style jsx>{`
-        .menu-container { min-height:100vh; padding-top:110px; padding-bottom:120px; background:var(--background); }
+        .menu-container { min-height:100vh; padding-top:110px; padding-bottom:120px; background:transparent; }
 
         .navbar { position:fixed; top:0; left:0; width:100%; z-index:100; border-bottom:1px solid var(--border); }
-        .navbar-content { display:flex; justify-content:space-between; align-items:center; padding:1rem 1.2rem; max-width:800px; margin:0 auto; }
+        .navbar-content { display:flex; justify-content:space-between; align-items:center; padding:0.8rem 1.2rem; max-width:800px; margin:0 auto; }
         .brand { display:flex; align-items:center; }
-        .nav-logo-img { height:36px; width:auto; display:block; }
+        .nav-logo-img { height:82px; width:auto; display:block; }
+        @media (max-width: 600px) {
+          .navbar-content { position:relative; justify-content:center; }
+          .brand { position:absolute; left:50%; transform:translateX(-50%); }
+          .nav-logo-img { height:84px; }
+          .navbar-right { position:absolute; right:1.2rem; }
+        }
         .brand h1 { font-size:1.6rem; margin:0; letter-spacing:0.12em; }
         .navbar-right { display:flex; align-items:center; gap:0.8rem; }
         .table-badge { font-size:0.65rem; background:var(--primary); color:#fff; padding:0.2rem 0.6rem; border-radius:4px; font-weight:800; letter-spacing:0.08em; }
@@ -374,7 +380,7 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
         .search-bar input { flex:1; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:0.6rem 1rem; color:var(--text); font-size:0.95rem; outline:none; }
         .search-bar input:focus { border-color:var(--primary); }
 
-        .category-nav { display:flex; gap:0.6rem; padding:0.8rem 1.2rem; overflow-x:auto; scrollbar-width:none; position:sticky; top:72px; background:var(--background); z-index:90; border-bottom:1px solid var(--border); align-items:center; }
+        .category-nav { display:flex; gap:0.6rem; padding:0.8rem 1.2rem; overflow-x:auto; scrollbar-width:none; position:sticky; top:72px; background:var(--background); background-image:url('/pattern.svg'); background-size:260px 260px; z-index:90; border-bottom:1px solid var(--border); align-items:center; }
         .category-nav::-webkit-scrollbar { display:none; }
         .nav-divider { width:1px; height:24px; background:var(--border); margin:0 0.4rem; flex-shrink:0; }
         .back-btn { background:var(--primary-light) !important; color:var(--primary) !important; }
@@ -382,8 +388,8 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
         .category-item { display:flex; align-items:center; gap:0.4rem; padding:0.45rem 1.1rem; background:var(--surface); border-radius:30px; border:1px solid var(--border); white-space:nowrap; color:var(--text-muted); text-decoration:none; font-size:0.85rem; transition:all 0.2s; cursor:pointer; }
         .category-item.active { border-color:var(--primary); color:var(--primary); background:var(--primary-light); }
 
-        .categories-grid-view { max-width:800px; margin:0 auto; padding:2rem 1.2rem; }
-        .welcome-header { text-align:center; margin-bottom:2.5rem; }
+        .categories-grid-view { max-width:800px; margin:0 auto; padding:2rem 1.2rem; position:relative; z-index:1; }
+        .welcome-header { text-align:center; margin-bottom:2.5rem; background:rgba(255,255,255,0.92); border-radius:14px; padding:1.5rem 1.5rem 1rem; box-shadow:0 2px 16px rgba(0,0,0,0.05); }
         .welcome-header h2 { font-size:1.8rem; margin-bottom:0.5rem; color:var(--text); }
         .welcome-header p { color:var(--text-muted); font-size:0.95rem; }
 
@@ -400,9 +406,9 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
         .cat-card h3 { font-family:var(--font-playfair); font-size:1.1rem; margin:0; color:var(--text); }
         .cat-count { font-size:0.75rem; text-transform:uppercase; color:var(--text-muted); letter-spacing:0.05em; font-weight:600; }
 
-        .menu-list { max-width:800px; margin:0 auto; padding:1.5rem 1rem; }
+        .menu-list { max-width:800px; margin:0 auto; padding:1.5rem 1rem; position:relative; z-index:1; }
         .section { margin-bottom:3rem; }
-        .section-title { font-size:1.5rem; margin-bottom:1rem; border-left:3px solid var(--primary); padding-left:0.8rem; font-family:var(--font-playfair); }
+        .section-title { font-size:1.5rem; margin-bottom:1rem; border-left:3px solid var(--primary); padding:0.4rem 0.8rem; font-family:var(--font-playfair); background:rgba(255,255,255,0.92); border-radius:0 10px 10px 0; display:inline-block; }
         .products-list { display:grid; grid-template-columns: 1fr; gap:1.2rem; }
         @media (min-width: 768px) { .products-list { grid-template-columns: repeat(2, 1fr); } }
         @media (min-width: 1200px) { .products-list { grid-template-columns: repeat(3, 1fr); } }

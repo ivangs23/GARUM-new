@@ -24,10 +24,11 @@ export default function Home() {
   return (
     <main className="main-container">
 
-      {/* Franja verde salvia superior — evoca las paredes del local */}
+      {/* Franja lila superior */}
       <div className="top-band" />
 
-      <header className="header">
+
+<header className="header">
         <div className="logo-wrap" onClick={handleLogoClick} style={{ cursor: 'default' }}>
           <img src="/Logo%20garum.png" alt="Garum Vinoteca" className="brand-logo" />
         </div>
@@ -73,11 +74,11 @@ export default function Home() {
           display: flex;
           flex-direction: column;
           align-items: center;
-          background: var(--background);
+          background: transparent;
           position: relative;
         }
 
-        /* Banda lila superior */
+/* Banda lila superior */
         .top-band {
           width: 100%;
           height: 5px;
@@ -85,6 +86,10 @@ export default function Home() {
         }
 
         /* Header con el logo — fondo blanco */
+        .header, .hero, .features-grid, .site-footer {
+          position: relative;
+          z-index: 1;
+        }
         .header {
           text-align: center;
           padding: 3rem 2rem 2.5rem;
@@ -110,7 +115,11 @@ export default function Home() {
         .hero {
           text-align: center;
           max-width: 680px;
-          padding: 3rem 2rem 2rem;
+          padding: 2.5rem 2.5rem 2.5rem;
+          margin: 2rem 1.5rem;
+          background: rgba(255, 255, 255, 0.92);
+          border-radius: 16px;
+          box-shadow: 0 2px 20px rgba(0,0,0,0.06);
         }
         .hero-title {
           font-size: 2.2rem;

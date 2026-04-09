@@ -41,7 +41,10 @@
 html, body {
   max-width: 100vw;
   overflow-x: hidden;
-  background: var(--background);
+  background-color: var(--background);
+  background-image: url('/pattern.svg');
+  background-size: 260px 260px;
+  background-repeat: repeat;
   color: var(--text);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
