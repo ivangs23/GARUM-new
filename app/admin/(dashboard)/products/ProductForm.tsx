@@ -1,20 +1,15 @@
 "use client";
 
-import { useState, useRef } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useState, useRef, useEffect } from 'react';
+import { supabaseBrowser as supabase } from '@/lib/supabase-browser';
 import { useRouter } from 'next/navigation';
 import { Loader2, Plus, X, Upload } from 'lucide-react';
 import Image from 'next/image';
+import { buildCategoryTree, flattenTree } from '@/lib/category-tree';
 
-const ALLERGENS = [
-  { id: 1, name: 'Gluten', icon: '🌾' }, { id: 2, name: 'Crustáceos', icon: '🦞' },
-  { id: 3, name: 'Huevos', icon: '🥚' }, { id: 4, name: 'Pescado', icon: '🐟' },
-  { id: 5, name: 'Cacahuetes', icon: '🥜' }, { id: 6, name: 'Soja', icon: '🌱' },
-  { id: 7, name: 'Lácteos', icon: '🥛' }, { id: 8, name: 'Frutos de cáscara', icon: '🌰' },
-  { id: 9, name: 'Apio', icon: '🌿' }, { id: 10, name: 'Mostaza', icon: '🟡' },
-  { id: 11, name: 'Sésamo', icon: '🌰' }, { id: 12, name: 'Dióxido de azufre', icon: '💨' },
-  { id: 13, name: 'Altramuces', icon: '🌻' }, { id: 14, name: 'Moluscos', icon: '🐚' },
-];
+// Alérgenos se cargan desde la misma BD que el kiosko,
+// garantizando consistencia entre ambas apps.
+type AllergenRow = { id: number; name: string; icon: string | null };
 
 type Extra = { id?: string; name: string; price: number };
 type ProductData = {
@@ -31,12 +26,21 @@ type ProductData = {
 
 type Props = {
   initial?: ProductData & { product_extras?: Extra[] };
-  categories: { id: string; name: string }[];
+  categories: { id: string; name: string; parent_id: string | null }[];
+  onSuccess?: () => void;
+  onCancel?: () => void;
 };
 
-export default function ProductForm({ initial, categories }: Props) {
+export default function ProductForm({ initial, categories, onSuccess, onCancel }: Props) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const [allergens, setAllergens] = useState<AllergenRow[]>([]);
+
+  useEffect(() => {
+    supabase.from('allergens').select('id, name, icon').order('id')
+      .then(({ data }) => { if (data) setAllergens(data); });
+  }, []);
 
   const [form, setForm] = useState<ProductData>(initial ?? {
     category_id: categories[0]?.id ?? '',
@@ -61,8 +65,19 @@ export default function ProductForm({ initial, categories }: Props) {
   const handleImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    const ALLOWED = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!ALLOWED.includes(file.type)) {
+      setError('Solo se permiten imágenes JPEG, PNG, WebP o GIF.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('La imagen no puede superar 5 MB.');
+      return;
+    }
+
     setUploading(true);
-    const ext = file.name.split('.').pop();
+    const ext  = file.type.split('/')[1].replace('jpeg', 'jpg');
     const path = `${Date.now()}.${ext}`;
     const { error, data } = await supabase.storage.from('products').upload(path, file);
     if (error) { setError(`Error subiendo imagen: ${error.message}`); setUploading(false); return; }
@@ -76,6 +91,13 @@ export default function ProductForm({ initial, categories }: Props) {
   const setExtra = (i: number, k: keyof Extra, v: string | number) =>
     setExtras(e => e.map((ex, idx) => idx === i ? { ...ex, [k]: v } : ex));
 
+  function mapDbError(err: { code?: string; message?: string }): string {
+    if (err.code === '23505') return 'Ya existe un producto con ese nombre en esta categoría.';
+    if (err.code === '23503') return 'La categoría seleccionada no existe.';
+    if (err.code === '42501') return 'No tienes permiso para realizar esta acción.';
+    return 'Error al guardar el producto. Inténtalo de nuevo.';
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -85,29 +107,26 @@ export default function ProductForm({ initial, categories }: Props) {
 
     // Remove relations from base data
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { product_extras, ...baseData } = form as any;
+    const { product_extras: _extras, ...baseData } = form as any;
 
     if (productId) {
       const { error } = await supabase.from('products').update(baseData).eq('id', productId);
-      if (error) { setError(error.message); setLoading(false); return; }
+      if (error) { setError(mapDbError(error)); setLoading(false); return; }
     } else {
       const { data, error } = await supabase.from('products').insert(baseData).select('id').single();
-      if (error) { setError(error.message); setLoading(false); return; }
+      if (error) { setError(mapDbError(error)); setLoading(false); return; }
       productId = data.id;
     }
 
     // Sync extras
-    await supabase.from('product_extras').delete().eq('product_id', productId);
+    await supabase.from('product_extras').delete().eq('product_id', productId!);
     if (extras.length > 0) {
       await supabase.from('product_extras').insert(
-        extras.filter(ex => ex.name).map(ex => ({ product_id: productId, name: ex.name, price: ex.price }))
+        extras.filter(ex => ex.name).map(ex => ({ product_id: productId!, name: ex.name, price: ex.price }))
       );
     }
 
-    router.refresh();
-    setTimeout(() => {
-      router.push('/admin/products');
-    }, 50);
+    if (onSuccess) { onSuccess(); } else { router.push('/admin/products'); router.refresh(); }
   };
 
   return (
@@ -117,7 +136,7 @@ export default function ProductForm({ initial, categories }: Props) {
       <div className="image-section">
         <div className="image-preview" onClick={() => fileRef.current?.click()}>
           {form.image_url ? (
-            <Image src={form.image_url} alt="preview" fill style={{ objectFit: 'cover' }} />
+            <Image src={form.image_url} alt="preview" fill sizes="160px" style={{ objectFit: 'cover' }} />
           ) : (
             <div className="image-placeholder">
               {uploading ? <Loader2 size={24} className="spin" /> : <Upload size={24} />}
@@ -138,7 +157,11 @@ export default function ProductForm({ initial, categories }: Props) {
         <label>
           Categoría
           <select value={form.category_id} onChange={e => set('category_id', e.target.value)} required>
-            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {flattenTree(buildCategoryTree(categories)).map(c => (
+              <option key={c.id} value={c.id}>
+                {'\u00A0\u00A0'.repeat(c.depth)}{c.depth > 0 ? '└ ' : ''}{c.name}
+              </option>
+            ))}
           </select>
         </label>
         <label>
@@ -170,14 +193,14 @@ export default function ProductForm({ initial, categories }: Props) {
       <div className="section-block">
         <h3 className="section-label">Alérgenos</h3>
         <div className="allergens-grid">
-          {ALLERGENS.map(a => (
+          {allergens.map(a => (
             <button
               key={a.id}
               type="button"
               onClick={() => toggleAllergen(a.id)}
               className={`allergen-btn ${form.allergen_ids.includes(a.id) ? 'active' : ''}`}
             >
-              {a.icon} {a.name}
+              {a.icon ?? ''} {a.name}
             </button>
           ))}
         </div>
@@ -205,7 +228,7 @@ export default function ProductForm({ initial, categories }: Props) {
       {error && <p className="error-msg">{error}</p>}
 
       <div className="form-actions">
-        <button type="button" onClick={() => router.back()} className="btn-secondary">Cancelar</button>
+        <button type="button" onClick={() => onCancel ? onCancel() : router.back()} className="btn-secondary">Cancelar</button>
         <button type="submit" className="gold-button" disabled={loading || uploading}>
           {loading ? <Loader2 size={16} className="spin" /> : (initial ? 'Guardar cambios' : 'Crear producto')}
         </button>

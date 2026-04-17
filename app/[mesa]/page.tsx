@@ -5,7 +5,11 @@ import Link from 'next/link';
 import { Search, Loader2, Plus, Minus, ShoppingBag, ArrowLeft, X } from 'lucide-react';
 import Image from 'next/image';
 import { useCart } from '@/context/CartContext';
+import { useLanguage } from '@/context/LanguageContext';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
 import { supabase } from '@/lib/supabase';
+import { buildCategoryTree, countSubtreeProducts } from '@/lib/category-tree';
+import type { CartItem } from '@/context/CartContext';
 
 const ALLERGEN_ICONS: Record<number, string> = {
   1:'🌾', 2:'🦞', 3:'🥚', 4:'🐟', 5:'🥜', 6:'🌱',
@@ -14,42 +18,218 @@ const ALLERGEN_ICONS: Record<number, string> = {
 
 type Extra   = { id: string; name: string; price: number };
 type Product = { id: string; name: string; description: string; price: number; image_url: string | null; allergen_ids: number[]; product_extras: Extra[]; destination?: 'cocina' | 'barra' };
-type Category = { id: string; name: string; slug: string; icon: string; destination: 'cocina' | 'barra'; products: Product[] };
+type Category = { id: string; name: string; slug: string; icon: string | null; destination: 'cocina' | 'barra'; products: Product[]; parent_id: string | null; children: Category[] };
+
+// ── CategoryMenuSection ───────────────────────────────────────────────────────
+// Componente propio para que styled-jsx aplique scoping correcto en la recursión.
+type CatSectionProps = {
+  cat: Category;
+  depth?: number;
+  getQty: (id: string) => number;
+  openProduct: (p: Product) => void;
+  items: CartItem[];
+  removeItem: (id: CartItem['id']) => void;
+};
+
+function CategoryMenuSection({ cat, depth = 0, getQty, openProduct, items, removeItem }: CatSectionProps) {
+  return (
+    <section id={cat.slug} className={depth === 0 ? 'cat-section' : 'cat-subsection'}>
+      {depth === 0
+        ? <h2 className="cat-section-title">{cat.name}</h2>
+        : <h3 className="cat-subsection-title">{cat.icon} {cat.name}</h3>
+      }
+
+      {cat.products.length > 0 && (
+        <div className="cat-products-list">
+          {cat.products.map(p => {
+            const qty = getQty(p.id);
+            return (
+              <div key={p.id} className="cat-product-card" onClick={() => openProduct(p)}>
+                <div className={`cat-product-info ${p.image_url ? 'has-img' : ''}`}>
+                  <h3>{p.name}</h3>
+                  <p className="cat-product-desc">{p.description}</p>
+                  {p.allergen_ids?.length > 0 && (
+                    <div className="cat-allergens">
+                      {p.allergen_ids.map((id: number) => (
+                        <span key={id} className="cat-allergen-icon">{ALLERGEN_ICONS[id] ?? '⚠️'}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="cat-product-action">
+                  {p.image_url && (
+                    <div className="cat-img-wrap">
+                      <Image src={p.image_url} alt={p.name} fill sizes="90px" style={{ objectFit: 'cover' }} />
+                    </div>
+                  )}
+                  <span className="cat-price">{Number(p.price).toFixed(2)}€</span>
+                  <div className={`cat-qty-controls ${qty === 0 ? 'empty' : 'filled'}`} onClick={e => e.stopPropagation()}>
+                    {qty > 0 && (
+                      <>
+                        <button className="cat-qty-btn" onClick={() => {
+                          const match = items.find(i => i.id === p.id || String(i.id).startsWith(p.id + '_'));
+                          if (match) removeItem(match.id);
+                        }}><Minus size={16} /></button>
+                        <span className="cat-qty-num">{qty}</span>
+                      </>
+                    )}
+                    <button className="cat-add-btn" onClick={() => openProduct(p)}><Plus size={16} /></button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {cat.children.map(child => (
+        <CategoryMenuSection
+          key={child.id}
+          cat={child}
+          depth={depth + 1}
+          getQty={getQty}
+          openProduct={openProduct}
+          items={items}
+          removeItem={removeItem}
+        />
+      ))}
+
+      <style jsx>{`
+        .cat-section  { margin-bottom: 3rem; }
+        .cat-subsection { margin-top: 2rem; margin-bottom: 1.5rem; }
+
+        .cat-section-title {
+          font-size: 1.5rem; margin-bottom: 1rem;
+          border-left: 3px solid var(--primary); padding: 0.4rem 0.8rem;
+          font-family: var(--font-playfair);
+          background: rgba(255,255,255,0.92); border-radius: 0 10px 10px 0;
+          display: inline-block;
+        }
+        .cat-subsection-title {
+          font-size: 1.1rem; font-family: var(--font-playfair);
+          color: var(--primary); border-left: 2px solid var(--primary);
+          padding-left: 0.6rem; margin-bottom: 0.8rem; display: inline-block;
+        }
+
+        .cat-products-list {
+          display: grid; grid-template-columns: 1fr; gap: 1.2rem;
+        }
+        @media (min-width: 768px)  { .cat-products-list { grid-template-columns: repeat(2, 1fr); } }
+        @media (min-width: 1200px) { .cat-products-list { grid-template-columns: repeat(3, 1fr); } }
+
+        .cat-product-card {
+          background: #fff; padding: 1.5rem; border-radius: 24px;
+          display: flex; flex-direction: column; justify-content: space-between;
+          gap: 1.2rem; cursor: pointer; transition: all 0.3s ease;
+          box-shadow: 0 12px 35px rgba(0,0,0,0.03); position: relative;
+        }
+        .cat-product-card:active { transform: scale(0.98); }
+        .cat-product-card:hover  { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(123,29,46,0.08); }
+
+        .cat-product-info { display: flex; flex-direction: column; gap: 0.4rem; }
+        .cat-product-info h3 { margin: 0; font-size: 1.25rem; color: #222; font-family: var(--font-playfair); font-weight: 800; }
+        .cat-product-desc { font-size: 0.85rem; color: #777; margin: 0; line-height: 1.5; height: 3em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+        .cat-allergens { display: flex; gap: 0.3rem; flex-wrap: wrap; margin-top: 0.2rem; }
+        .cat-allergen-icon { font-size: 0.9rem; }
+
+        .cat-product-info.has-img { padding-right: 110px; min-height: 90px; }
+
+        .cat-img-wrap {
+          position: absolute; top: 1.5rem; right: 1.5rem;
+          width: 90px; height: 90px; border-radius: 18px;
+          overflow: hidden; box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+          background: #fff; padding: 4px; border: 1px solid rgba(0,0,0,0.03);
+        }
+        .cat-img-wrap :global(img) { border-radius: 14px; }
+
+        .cat-product-action { display: flex; align-items: center; justify-content: space-between; margin-top: 0.5rem; }
+        .cat-price { font-weight: 500; color: #222; font-size: 1.05rem; }
+
+        .cat-qty-controls { display: flex; align-items: center; justify-content: center; border-radius: 30px; transition: all 0.2s; }
+        .cat-qty-controls.filled { background: #fff; border: 1px solid rgba(123,29,46,0.2); padding: 0.2rem 0.4rem; gap: 0.5rem; box-shadow: 0 4px 10px rgba(123,29,46,0.05); }
+        .cat-qty-controls.empty  { border: none; background: transparent; padding: 0; gap: 0; }
+
+        .cat-qty-num { font-weight: 800; min-width: 18px; text-align: center; color: #222; font-size: 1rem; }
+        .cat-qty-btn { width: 34px; height: 34px; border-radius: 50%; border: none; background: none; color: var(--text-muted); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .cat-add-btn { width: 38px; height: 38px; border-radius: 50%; border: 1px solid rgba(123,29,46,0.4); background: none; color: var(--primary); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
+        .cat-qty-controls.filled .cat-add-btn { width: 34px; height: 34px; border: none; background: none; }
+        .cat-qty-controls.empty  .cat-add-btn:hover { background: rgba(123,29,46,0.05); border-color: var(--primary); }
+      `}</style>
+    </section>
+  );
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function MesaPage({ params }: { params: Promise<{ mesa: string }> }) {
   const { mesa } = use(params);
 
-  const [categories, setCategories]           = useState<Category[]>([]);
-  const [activeCategory, setActiveCategory]   = useState('');
-  const [search, setSearch]                   = useState('');
-  const [showSearch, setShowSearch]           = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [selectedExtras, setSelectedExtras]   = useState<Extra[]>([]);
-  const [loading, setLoading]                 = useState(true);
-  const [paying, setPaying]                   = useState(false);
-  const [view, setView]                       = useState<'categories' | 'menu'>('categories');
-  const [isCartOpen, setIsCartOpen]           = useState(false);
+  const [categories, setCategories]               = useState<Category[]>([]);
+  const [activeCategory, setActiveCategory]       = useState('');
+  const [searchInput, setSearchInput]             = useState('');
+  const [search, setSearch]                       = useState('');
+  const [showSearch, setShowSearch]               = useState(false);
+  const [selectedProduct, setSelectedProduct]     = useState<Product | null>(null);
+  const [selectedExtras, setSelectedExtras]       = useState<Extra[]>([]);
+  const [loading, setLoading]                     = useState(true);
+  const [loadError, setLoadError]                 = useState('');
+  const [paying, setPaying]                       = useState(false);
+  const [view, setView]                           = useState<'categories' | 'menu'>('categories');
+  const [isCartOpen, setIsCartOpen]               = useState(false);
+  const [maintenance, setMaintenance]             = useState<{ enabled: boolean; message: string } | null>(null);
 
   const { addItem, items, totalQuantity, totalAmount, removeItem } = useCart();
-  const getQty = (id: string) => items.find(i => i.id === id)?.quantity ?? 0;
+  const { t } = useLanguage();
+
+  // Suma cantidades de un producto base aunque tenga extras (IDs compuestos: "uuid_extraUuid")
+  const getQty = (id: string) =>
+    items
+      .filter(i => i.id === id || String(i.id).startsWith(id + '_'))
+      .reduce((sum, i) => sum + i.quantity, 0);
+
+  // Debounce: actualiza el filtro 300ms después de que el usuario deje de escribir
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(searchInput), 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   useEffect(() => {
-    setLoading(true);
-    supabase
-      .from('categories')
-      .select('*, products(*, product_extras(*))')
-      .order('sort_order')
-      .then(({ data }) => {
+    (async () => {
+      setLoading(true);
+      try {
+        const [{ data: settingsData }, { data, error }] = await Promise.all([
+          supabase.from('settings').select('key, value'),
+          supabase.from('categories').select('*, products(*, product_extras(*))').order('sort_order'),
+        ]);
+
+        const settings: Record<string, string> = Object.fromEntries(
+          (settingsData ?? []).map((r: any) => [r.key, r.value])
+        );
+        setMaintenance({
+          enabled: settings['maintenance_enabled'] === 'true',
+          message: settings['maintenance_message'] ?? 'Estamos cerrados temporalmente. ¡Volvemos muy pronto!',
+        });
+
+        if (error) throw error;
         if (data?.length) {
           const enriched = (data as any[]).map(cat => ({
             ...cat,
-            products: cat.products.map((p: any) => ({ ...p, destination: cat.destination }))
+            children: [],
+            products: cat.products
+              .filter((p: any) => p.is_available === true)
+              .map((p: any) => ({ ...p, destination: cat.destination })),
           }));
-          setCategories(enriched as Category[]);
-          setActiveCategory(data[0].slug);
+          const roots = buildCategoryTree(enriched as Category[])
+            .filter(cat => countSubtreeProducts(cat as any) > 0) as Category[];
+          setCategories(roots);
+          setActiveCategory(roots[0]?.slug ?? '');
         }
+      } catch (err) {
+        console.error('Error cargando la carta:', err);
+        setLoadError('No se pudo cargar la carta. Por favor, recarga la página.');
+      } finally {
         setLoading(false);
-      });
+      }
+    })();
   }, []);
 
   const handleCheckout = async () => {
@@ -93,18 +273,18 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
     }, 100);
   };
 
-  const filteredCategories = categories.map(cat => ({
-    ...cat,
-    products: cat.products.filter(p =>
-      !search ||
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.description?.toLowerCase().includes(search.toLowerCase())
-    ),
-  })).filter(cat => {
-    if (search) return cat.products.length > 0;
-    // Si estamos en la vista de menú, solo mostramos la categoría activa
-    return view === 'menu' ? cat.slug === activeCategory : true;
-  });
+  // Collect all products from the full tree (for search)
+  const collectProducts = (cats: Category[]): Product[] =>
+    cats.flatMap(cat => [...cat.products, ...collectProducts(cat.children)]);
+
+  const searchResults: Product[] = search
+    ? collectProducts(categories).filter(p =>
+        p.name.toLowerCase().includes(search.toLowerCase()) ||
+        p.description?.toLowerCase().includes(search.toLowerCase())
+      )
+    : [];
+
+  const activeRootCategory = categories.find(c => c.slug === activeCategory) ?? null;
 
   if (loading) return (
     <div className="loading-screen">
@@ -113,6 +293,66 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
         .loading-screen { min-height:100vh; display:flex; align-items:center; justify-content:center; background:transparent; }
         .spin { animation:spin 1s linear infinite; color:var(--primary); }
         @keyframes spin { to { transform:rotate(360deg); } }
+      `}</style>
+    </div>
+  );
+
+  if (loadError) return (
+    <div className="loading-screen">
+      <p style={{ color: 'var(--primary)', textAlign: 'center', padding: '2rem' }}>{loadError}</p>
+      <style jsx>{`
+        .loading-screen { min-height:100vh; display:flex; align-items:center; justify-content:center; background:transparent; }
+      `}</style>
+    </div>
+  );
+
+  if (maintenance?.enabled) return (
+    <div className="maintenance-screen">
+      <div className="maintenance-card">
+        <img src="/Logo%20garum.png" alt="Garum Vinoteca" className="maintenance-logo" />
+        <div className="maintenance-icon">🔧</div>
+        <h1 className="serif">Fuera de servicio</h1>
+        <p className="maintenance-msg">{maintenance.message}</p>
+      </div>
+      <style jsx>{`
+        .maintenance-screen {
+          min-height: 100vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 2rem 1rem;
+          background: var(--background);
+          background-image: url('/pattern.svg');
+          background-size: 260px 260px;
+        }
+        .maintenance-card {
+          width: 100%;
+          max-width: 400px;
+          background: #fff;
+          border-radius: 24px;
+          border: 1px solid var(--border);
+          box-shadow: 0 8px 40px rgba(0,0,0,0.08);
+          padding: 3rem 2rem;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 1.2rem;
+          text-align: center;
+        }
+        .maintenance-logo { width: 140px; height: auto; }
+        .maintenance-icon { font-size: 3rem; animation: sway 3s ease-in-out infinite; }
+        @keyframes sway {
+          0%, 100% { transform: rotate(-8deg); }
+          50%       { transform: rotate(8deg); }
+        }
+        h1 { font-size: 1.8rem; margin: 0; color: var(--text); }
+        .maintenance-msg {
+          color: var(--text-muted);
+          font-size: 1rem;
+          line-height: 1.6;
+          margin: 0;
+          white-space: pre-wrap;
+        }
       `}</style>
     </div>
   );
@@ -127,8 +367,9 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
             <img src="/Logo%20garum.png" alt="Garum Vinoteca" className="nav-logo-img" />
           </Link>
           <div className="navbar-right">
-            <span className="table-badge">MESA {mesa}</span>
-            <button className="icon-btn" onClick={() => { setShowSearch(s => !s); if(!showSearch) setView('menu'); }}>
+            <span className="table-badge">{t('menu.tableLabel')} {mesa}</span>
+            <LanguageSwitcher />
+            <button className="icon-btn" onClick={() => { const next = !showSearch; setShowSearch(next); if (next) setView('menu'); else { setSearchInput(''); setSearch(''); } }}>
               <Search size={22} />
             </button>
           </div>
@@ -138,9 +379,9 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
             <Search size={16} color="var(--text-muted)" />
             <input
               autoFocus
-              placeholder="Buscar plato o bebida..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
+              placeholder={t('menu.searchPlaceholder')}
+              value={searchInput}
+              onChange={e => setSearchInput(e.target.value)}
             />
           </div>
         )}
@@ -150,8 +391,8 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
       {view === 'categories' && !search && (
         <main className="categories-grid-view">
           <div className="welcome-header">
-            <h2 className="serif">¿Qué te apetece hoy?</h2>
-            <p>Selecciona una categoría para empezar</p>
+            <h2 className="serif">{t('menu.welcomeTitle')}</h2>
+            <p>{t('menu.welcomeSubtitle')}</p>
           </div>
           <div className="cat-grid">
             {categories.map(cat => (
@@ -164,7 +405,7 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
                   <span className="cat-icon-lg">{cat.icon || '🍷'}</span>
                 </div>
                 <h3>{cat.name}</h3>
-                <span className="cat-count">{cat.products.length} platos</span>
+                <span className="cat-count">{countSubtreeProducts(cat as any)} {t('menu.dishes')}</span>
               </div>
             ))}
           </div>
@@ -182,62 +423,70 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
                 onClick={() => setView('categories')}
               >
                 <ArrowLeft size={16} /> 
-                <span>Explorar otras categorías</span>
+                <span>{t('menu.backToCategories')}</span>
               </button>
             </nav>
           )}
 
           <main className="menu-list">
-            {filteredCategories.map(cat => (
-              <section key={cat.slug} id={cat.slug} className="section">
-                <h2 className="section-title">{cat.name}</h2>
-                <div className="products-list">
-                  {cat.products.map(p => {
-                    const qty = getQty(p.id);
-                    return (
-                      <div key={p.id} className="product-card" onClick={() => openProduct(p)}>
-                        <div className={`product-info ${p.image_url ? 'has-img' : ''}`}>
-                          <h3>{p.name}</h3>
-                          <p className="product-desc">{p.description}</p>
-                          {p.allergen_ids?.length > 0 && (
-                            <div className="allergens">
-                              {p.allergen_ids.map(id => (
-                                <span key={id} className="allergen-icon">{ALLERGEN_ICONS[id]}</span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        <div className="product-action">
-                          {p.image_url && (
-                            <div className="product-img-wrap">
-                              <Image src={p.image_url} alt={p.name} fill style={{ objectFit: 'cover' }} />
-                            </div>
-                          )}
-                          <span className="price">{Number(p.price).toFixed(2)}€</span>
-                          <div className={`qty-controls ${qty === 0 ? 'empty' : 'filled'}`} onClick={e => e.stopPropagation()}>
-                            {qty > 0 && (
-                              <>
-                                <button className="qty-btn" onClick={() => removeItem(p.id)}><Minus size={16} /></button>
-                                <span className="qty-num">{qty}</span>
-                              </>
-                            )}
-                            <button className="add-btn" onClick={() => openProduct(p)}><Plus size={16} /></button>
-                          </div>
-                        </div>
+            {/* Modo búsqueda: lista plana de resultados */}
+            {search && searchResults.map(p => {
+              const qty = getQty(p.id);
+              return (
+                <div key={p.id} className="product-card" onClick={() => openProduct(p)}>
+                  <div className={`product-info ${p.image_url ? 'has-img' : ''}`}>
+                    <h3>{p.name}</h3>
+                    <p className="product-desc">{p.description}</p>
+                    {p.allergen_ids?.length > 0 && (
+                      <div className="allergens">
+                        {p.allergen_ids.map((id: number) => (
+                          <span key={id} className="allergen-icon">{ALLERGEN_ICONS[id] ?? '⚠️'}</span>
+                        ))}
                       </div>
-                    );
-                  })}
+                    )}
+                  </div>
+                  <div className="product-action">
+                    {p.image_url && (
+                      <div className="product-img-wrap">
+                        <Image src={p.image_url} alt={p.name} fill sizes="90px" style={{ objectFit: 'cover' }} />
+                      </div>
+                    )}
+                    <span className="price">{Number(p.price).toFixed(2)}€</span>
+                    <div className={`qty-controls ${qty === 0 ? 'empty' : 'filled'}`} onClick={e => e.stopPropagation()}>
+                      {qty > 0 && (
+                        <>
+                          <button className="qty-btn" onClick={() => {
+                            const match = items.find(i => i.id === p.id || String(i.id).startsWith(p.id + '_'));
+                            if (match) removeItem(match.id);
+                          }}><Minus size={16} /></button>
+                          <span className="qty-num">{qty}</span>
+                        </>
+                      )}
+                      <button className="add-btn" onClick={() => openProduct(p)}><Plus size={16} /></button>
+                    </div>
+                  </div>
                 </div>
-              </section>
-            ))}
+              );
+            })}
 
-            {filteredCategories.length === 0 && search && (
+            {/* Modo menú: árbol recursivo de la categoría activa */}
+            {!search && activeRootCategory && (
+              <CategoryMenuSection
+                cat={activeRootCategory}
+                getQty={getQty}
+                openProduct={openProduct}
+                items={items}
+                removeItem={removeItem}
+              />
+            )}
+
+            {search && searchResults.length === 0 && (
               <div className="empty-search">
                 <ShoppingBag size={48} color="var(--text-muted)" />
                 <p>Sin resultados para &ldquo;{search}&rdquo;</p>
               </div>
             )}
-            {filteredCategories.length === 0 && !search && !loading && (
+            {!search && !activeRootCategory && !loading && (
               <div className="empty-search">
                 <ShoppingBag size={48} color="var(--text-muted)" />
                 <p>La carta está vacía. Añade categorías y productos desde el panel de administración.</p>
@@ -253,7 +502,7 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
           <div className="modal glass" onClick={e => e.stopPropagation()}>
             {selectedProduct.image_url && (
               <div className="modal-img">
-                <Image src={selectedProduct.image_url} alt={selectedProduct.name} fill style={{ objectFit: 'cover' }} />
+                <Image src={selectedProduct.image_url} alt={selectedProduct.name} fill sizes="(max-width: 500px) 100vw, 500px" style={{ objectFit: 'cover' }} />
               </div>
             )}
             <div className="modal-body">
@@ -263,7 +512,7 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
 
               {selectedProduct.product_extras?.length > 0 && (
                 <div className="extras-section">
-                  <p className="extras-title">Extras</p>
+                  <p className="extras-title">{t('menu.extras')}</p>
                   {selectedProduct.product_extras.map(ex => (
                     <label key={ex.id} className="extra-item">
                       <input
@@ -283,7 +532,7 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
               )}
 
               <button className="gold-button modal-add-btn" onClick={confirmAdd}>
-                Añadir al pedido — {(Number(selectedProduct.price) + selectedExtras.reduce((s,e) => s+e.price, 0)).toFixed(2)}€
+                {t('menu.addToOrder')} — {(Number(selectedProduct.price) + selectedExtras.reduce((s,e) => s+e.price, 0)).toFixed(2)}€
               </button>
             </div>
           </div>
@@ -295,8 +544,8 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
         <footer className="footer-cart glass" onClick={() => setIsCartOpen(true)}>
           <div className="cart-summary">
             <div className="cart-text">
-              <strong>Mi Pedido</strong>
-              <p>{totalQuantity} {totalQuantity === 1 ? 'producto' : 'productos'}</p>
+              <strong>{t('menu.myOrder')}</strong>
+              <p>{totalQuantity} {totalQuantity === 1 ? t('menu.product') : t('menu.products')}</p>
             </div>
             <div className="cart-right">
               <span className="cart-total-mini">{totalAmount.toFixed(2)}€</span>
@@ -305,7 +554,7 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
                 onClick={(e) => { e.stopPropagation(); handleCheckout(); }} 
                 disabled={paying}
               >
-                {paying ? <Loader2 size={16} className="spin" /> : 'PAGAR'}
+                {paying ? <Loader2 size={16} className="spin" /> : t('menu.pay')}
               </button>
             </div>
           </div>
@@ -317,7 +566,7 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
         <div className="modal-overlay cart-overlay" onClick={() => setIsCartOpen(false)}>
           <div className="modal cart-modal" onClick={e => e.stopPropagation()}>
             <div className="cart-modal-header">
-              <h3>Pedido en curso</h3>
+              <h3>{t('menu.currentOrder')}</h3>
               <button className="close-btn" onClick={() => setIsCartOpen(false)}><X size={20} /></button>
             </div>
             
@@ -341,7 +590,7 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
               {items.length === 0 && (
                 <div className="empty-cart-msg">
                   <ShoppingBag size={40} color="var(--text-muted)" />
-                  <p>Tu carrito está vacío</p>
+                  <p>{t('menu.emptyCart')}</p>
                 </div>
               )}
             </div>
@@ -352,7 +601,7 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
                 <span>{totalAmount.toFixed(2)}€</span>
               </div>
               <button className="gold-button pay-btn-full" onClick={handleCheckout} disabled={paying || items.length === 0}>
-                {paying ? <Loader2 size={18} className="spin" /> : `CONFIRMAR Y PAGAR`}
+                {paying ? <Loader2 size={18} className="spin" /> : t('menu.confirmAndPay')}
               </button>
             </div>
           </div>
@@ -407,35 +656,25 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
         .cat-count { font-size:0.75rem; text-transform:uppercase; color:var(--text-muted); letter-spacing:0.05em; font-weight:600; }
 
         .menu-list { max-width:800px; margin:0 auto; padding:1.5rem 1rem; position:relative; z-index:1; }
-        .section { margin-bottom:3rem; }
-        .section-title { font-size:1.5rem; margin-bottom:1rem; border-left:3px solid var(--primary); padding:0.4rem 0.8rem; font-family:var(--font-playfair); background:rgba(255,255,255,0.92); border-radius:0 10px 10px 0; display:inline-block; }
-        .products-list { display:grid; grid-template-columns: 1fr; gap:1.2rem; }
-        @media (min-width: 768px) { .products-list { grid-template-columns: repeat(2, 1fr); } }
-        @media (min-width: 1200px) { .products-list { grid-template-columns: repeat(3, 1fr); } }
 
-        .product-card { background:#fff; padding:1.5rem; border-radius:24px; border:none; display:flex; flex-direction:column; justify-content:space-between; gap:1.2rem; cursor:pointer; transition:all 0.3s ease; box-shadow:0 12px 35px rgba(0,0,0,0.03); height:100%; position:relative; }
+        /* Estilos de tarjeta de producto para resultados de búsqueda (inline en MesaPage) */
+        .product-card { background:#fff; padding:1.5rem; border-radius:24px; border:none; display:flex; flex-direction:column; justify-content:space-between; gap:1.2rem; cursor:pointer; transition:all 0.3s ease; box-shadow:0 12px 35px rgba(0,0,0,0.03); position:relative; }
         .product-card:active { transform:scale(0.98); }
         .product-card:hover { transform:translateY(-4px); box-shadow:0 16px 40px rgba(123,29,46,0.08); }
-        
         .product-info { display:flex; flex-direction:column; gap:0.4rem; }
         .product-info h3 { margin:0; font-size:1.25rem; color:#222; font-family:var(--font-playfair); font-weight:800; }
         .product-desc { font-size:0.85rem; color:#777; margin:0; line-height:1.5; height:3em; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
         .allergens { display:flex; gap:0.3rem; flex-wrap:wrap; margin-top:0.2rem; }
         .allergen-icon { font-size:0.9rem; }
-        
+        .product-info.has-img { padding-right:110px; min-height:90px; }
         .product-action { display:flex; align-items:center; justify-content:space-between; margin-top:0.5rem; }
         .product-img-wrap { position:absolute; top:1.5rem; right:1.5rem; width:90px; height:90px; border-radius:18px; overflow:hidden; box-shadow:0 8px 20px rgba(0,0,0,0.08); background:#fff; padding:4px; border:1px solid rgba(0,0,0,0.03); }
         .product-img-wrap :global(img) { border-radius:14px; }
-        .product-info.has-img { padding-right:110px; min-height: 90px; }
-
         .price { font-weight:500; color:#222; font-size:1.05rem; }
-        
         .qty-controls { display:flex; align-items:center; justify-content:center; border-radius:30px; transition:all 0.2s; }
         .qty-controls.filled { background:#fff; border:1px solid rgba(123,29,46,0.2); padding:0.2rem 0.4rem; gap:0.5rem; box-shadow:0 4px 10px rgba(123,29,46,0.05); }
         .qty-controls.empty { border:none; background:transparent; padding:0; gap:0; }
-        
         .qty-num { font-weight:800; min-width:18px; text-align:center; color:#222; font-size:1rem; }
-        
         .qty-btn { width:34px; height:34px; border-radius:50%; border:none; background:none; color:var(--text-muted); display:flex; align-items:center; justify-content:center; cursor:pointer; }
         .add-btn { width:38px; height:38px; border-radius:50%; border:1px solid rgba(123,29,46,0.4); background:none; color:var(--primary); display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.2s; }
         .qty-controls.filled .add-btn { width:34px; height:34px; border:none; background:none; }

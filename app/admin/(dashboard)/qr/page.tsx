@@ -2,19 +2,14 @@
 
 import { useState, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Printer, Download, Plus, Minus, Info } from 'lucide-react';
+import { Printer, Plus, Minus, Info } from 'lucide-react';
 
 export default function QRGeneratorPage() {
   const [numTables, setNumTables] = useState(30);
-  const [baseUrl, setBaseUrl] = useState('');
+  const [baseUrl, setBaseUrl] = useState(() =>
+    typeof window !== 'undefined' ? window.location.origin : ''
+  );
   const printRef = useRef<HTMLDivElement>(null);
-
-  // Intentar obtener la URL base automáticamente al cargar
-  useState(() => {
-    if (typeof window !== 'undefined') {
-      setBaseUrl(window.location.origin);
-    }
-  });
 
   const handlePrint = () => {
     window.print();

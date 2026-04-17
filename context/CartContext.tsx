@@ -1,8 +1,8 @@
-"use client";
+// CartContext — sin "use client" para que sea importable en Server Components
+// El Provider con estado está en CartProvider.tsx ("use client")
+import { createContext, useContext } from 'react';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-
-type CartItem = {
+export type CartItem = {
   id: string | number;
   name: string;
   price: number;
@@ -10,7 +10,7 @@ type CartItem = {
   destination?: 'cocina' | 'barra';
 };
 
-type CartContextType = {
+export type CartContextType = {
   items: CartItem[];
   addItem: (item: Omit<CartItem, 'quantity'>) => void;
   removeItem: (id: string | number) => void;
@@ -19,59 +19,7 @@ type CartContextType = {
   totalAmount: number;
 };
 
-const CartContext = createContext<CartContextType | undefined>(undefined);
-
-export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>([]);
-
-  // Cargar carrito guardado (por si refrescan la página por error)
-  useEffect(() => {
-    const savedCart = localStorage.getItem('garum-cart');
-    if (savedCart) {
-      setItems(JSON.parse(savedCart));
-    }
-  }, []);
-
-  // Guardar cambios en el carrito
-  useEffect(() => {
-    localStorage.setItem('garum-cart', JSON.stringify(items));
-  }, [items]);
-
-  const addItem = (newItem: Omit<CartItem, 'quantity'>) => {
-    setItems(prevItems => {
-      const existing = prevItems.find(i => i.id === newItem.id);
-      if (existing) {
-        return prevItems.map(i => 
-          i.id === newItem.id ? { ...i, quantity: i.quantity + 1 } : i
-        );
-      }
-      return [...prevItems, { ...newItem, quantity: 1 }];
-    });
-  };
-
-  const removeItem = (id: string | number) => {
-    setItems(prevItems => {
-      const existing = prevItems.find(i => i.id === id);
-      if (existing?.quantity === 1) {
-        return prevItems.filter(i => i.id !== id);
-      }
-      return prevItems.map(i =>
-        i.id === id ? { ...i, quantity: i.quantity - 1 } : i
-      );
-    });
-  };
-
-  const clearCart = () => setItems([]);
-
-  const totalQuantity = items.reduce((acc, i) => acc + i.quantity, 0);
-  const totalAmount = items.reduce((acc, i) => acc + i.price * i.quantity, 0);
-
-  return (
-    <CartContext.Provider value={{ items, addItem, removeItem, clearCart, totalQuantity, totalAmount }}>
-      {children}
-    </CartContext.Provider>
-  );
-}
+export const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function useCart() {
   const context = useContext(CartContext);

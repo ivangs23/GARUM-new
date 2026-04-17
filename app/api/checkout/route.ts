@@ -6,54 +6,145 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2026-03-25.dahlia' as any,
 });
 
+// UUIDs only contain hex chars and hyphens — '_' is a safe separator
+function parseItemId(id: string | number): { productId: string; extraIds: string[] } {
+  const parts = String(id).split('_');
+  return { productId: parts[0], extraIds: parts.slice(1) };
+}
+
 export async function POST(req: Request) {
   try {
-    const { items, mesa } = await req.json();
+    const body = await req.json();
+    const { items, mesa } = body;
 
-    if (!items?.length) {
+    // --- Input validation ---
+    const mesaNum = parseInt(mesa, 10);
+    if (!Number.isInteger(mesaNum) || mesaNum < 1 || mesaNum > 999) {
+      return NextResponse.json({ error: 'Número de mesa inválido' }, { status: 400 });
+    }
+
+    if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: 'El carrito está vacío' }, { status: 400 });
     }
 
-    const total = items.reduce(
-      (acc: number, item: any) => acc + item.price * item.quantity,
-      0
-    );
+    for (const item of items) {
+      const qty = Number(item.quantity);
+      if (!Number.isInteger(qty) || qty < 1 || qty > 99) {
+        return NextResponse.json({ error: 'Cantidad de ítem inválida' }, { status: 400 });
+      }
+    }
 
-    // 1 — Crear pedido en Supabase como pendiente
+    // --- Fetch real prices from DB (prevents price manipulation) ---
+    const productIds = [...new Set(items.map((i: any) => parseItemId(i.id).productId))];
+    const allExtraIds = [...new Set(
+      items.flatMap((i: any) => parseItemId(i.id).extraIds)
+    )].filter(Boolean);
+
+    type ProductRow = { id: string; name: string; price: number; is_available: boolean };
+    type ExtraRow   = { id: string; price: number };
+
+    const { data: rawProducts, error: prodError } = await supabaseAdmin
+      .from('products')
+      .select('id, name, price, is_available')
+      .in('id', productIds);
+
+    if (prodError) throw prodError;
+    const products = (rawProducts ?? []) as ProductRow[];
+
+    let extraMap = new Map<string, number>();
+    if (allExtraIds.length > 0) {
+      const { data: rawExtras, error: extrasError } = await supabaseAdmin
+        .from('product_extras')
+        .select('id, price')
+        .in('id', allExtraIds);
+      if (extrasError) throw extrasError;
+      const extras = (rawExtras ?? []) as ExtraRow[];
+      extraMap = new Map(extras.map(e => [e.id, Number(e.price)]));
+    }
+
+    const productMap = new Map(products.map(p => [p.id, p]));
+
+    // --- Recalculate totals server-side using integer cents ---
+    let totalCents = 0;
+    const validatedItems: any[] = [];
+
+    for (const item of items) {
+      const { productId, extraIds } = parseItemId(item.id);
+      const product = productMap.get(productId);
+
+      if (!product) {
+        return NextResponse.json({ error: `Producto no encontrado: ${productId}` }, { status: 400 });
+      }
+      if (!product.is_available) {
+        return NextResponse.json({ error: `El producto "${product.name}" ya no está disponible` }, { status: 400 });
+      }
+
+      let priceCents = Math.round(Number(product.price) * 100);
+      for (const extraId of extraIds) {
+        const extraPrice = extraMap.get(extraId);
+        if (extraPrice === undefined) {
+          return NextResponse.json({ error: `Extra no encontrado: ${extraId}` }, { status: 400 });
+        }
+        priceCents += Math.round(extraPrice * 100);
+      }
+
+      const qty = Math.floor(Number(item.quantity));
+      totalCents += priceCents * qty;
+
+      validatedItems.push({
+        id:          item.id,
+        name:        item.name,
+        price:       priceCents / 100,   // store in euros, verified server-side
+        quantity:    qty,
+        destination: item.destination ?? null,
+      });
+    }
+
+    const total = totalCents / 100;
+
+    // --- Cleanup stale pending orders (> 30 min) to avoid DB bloat ---
+    await supabaseAdmin
+      .from('orders')
+      .update({ payment_status: 'cancelled' })
+      .eq('payment_status', 'pending')
+      .lt('created_at', new Date(Date.now() - 30 * 60 * 1000).toISOString());
+
+    // --- Create order in Supabase ---
     const { data: order, error: orderError } = await supabaseAdmin
       .from('orders')
       .insert([{
-        table_number: parseInt(mesa),
-        total_amount: total,
+        table_number:   mesaNum,
+        total_amount:   total,
         payment_status: 'pending',
-        items,
+        items:          validatedItems,
       }])
       .select()
       .single();
 
     if (orderError) throw orderError;
 
-    // 2 — Crear sesión de Stripe Checkout
-    const origin = req.headers.get('origin') ?? 'http://localhost:3000';
+    // --- Create Stripe Checkout session ---
+    const origin = process.env.NEXT_PUBLIC_APP_URL
+      ?? req.headers.get('origin')
+      ?? 'http://localhost:3001';
 
     const session = await stripe.checkout.sessions.create({
-      // payment_method_types omitido → Stripe elige automáticamente según la región
-      line_items: items.map((item: any) => ({
+      line_items: validatedItems.map(item => ({
         price_data: {
-          currency: 'eur',
+          currency:     'eur',
           product_data: { name: item.name },
-          unit_amount: Math.round(item.price * 100), // céntimos
+          unit_amount:  Math.round(item.price * 100),
         },
         quantity: item.quantity,
       })),
-      mode: 'payment',
-      success_url: `${origin}/success?mesa=${mesa}&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url:  `${origin}/${mesa}`,
-      client_reference_id: order.id,
-      metadata: { mesa: String(mesa), order_id: order.id },
+      mode:                 'payment',
+      success_url:          `${origin}/success?mesa=${mesaNum}&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url:           `${origin}/${mesaNum}`,
+      client_reference_id:  order.id,
+      metadata:             { mesa: String(mesaNum), order_id: order.id },
     });
 
-    // 3 — Guardar stripe_session_id en el pedido (para deduplicación en el webhook)
+    // --- Save stripe_session_id for webhook deduplication ---
     await supabaseAdmin
       .from('orders')
       .update({ stripe_session_id: session.id })
@@ -62,6 +153,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ url: session.url });
   } catch (err: any) {
     console.error('Checkout Error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: 'Error al procesar el pedido. Inténtalo de nuevo.' }, { status: 500 });
   }
 }

@@ -2,15 +2,12 @@
 
 import { QRCodeSVG } from 'qrcode.react';
 import { Wine } from 'lucide-react';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 
 export default function QrGeneratorPage() {
-  const [baseUrl, setBaseUrl] = useState('');
-
-  useEffect(() => {
-    // Obtenemos la URL base del sitio actual (ej: garum.vercel.app o localhost:3000)
-    setBaseUrl(window.location.origin);
-  }, []);
+  const [baseUrl] = useState(() =>
+    typeof window !== 'undefined' ? window.location.origin : ''
+  );
 
   const totalMesas = 30;
   const mesas = Array.from({ length: totalMesas }, (_, i) => i + 1);

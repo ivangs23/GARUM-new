@@ -2,23 +2,24 @@ import { createSupabaseServerClient } from '@/lib/supabase-server';
 export const dynamic = 'force-dynamic';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Plus, Pencil } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 import DeleteProductButton from './DeleteProductButton';
+import ToggleAvailableButton from './ToggleAvailableButton';
+import NewProductModal from './NewProductModal';
 
 export default async function ProductsPage() {
   const supabase = await createSupabaseServerClient();
-  const { data: products } = await supabase
-    .from('products')
-    .select('*, categories(name)')
-    .order('sort_order');
+
+  const [{ data: products }, { data: categories }] = await Promise.all([
+    supabase.from('products').select('*, categories(name)').order('sort_order'),
+    supabase.from('categories').select('id, name, parent_id').order('sort_order'),
+  ]);
 
   return (
     <div>
       <div className="admin-page-header">
         <h1 className="admin-page-title">Productos</h1>
-        <Link href="/admin/products/new" className="admin-btn-sm">
-          <Plus size={16} /> Nuevo producto
-        </Link>
+        <NewProductModal categories={categories ?? []} />
       </div>
 
       <div className="admin-table-wrap">
@@ -50,9 +51,7 @@ export default async function ProductsPage() {
                 <td className="muted">{(p.categories as any)?.name}</td>
                 <td><strong className="admin-price">{Number(p.price).toFixed(2)}€</strong></td>
                 <td>
-                  <span className={`admin-badge ${p.is_available ? 'available' : 'unavailable'}`}>
-                    {p.is_available ? 'Sí' : 'No'}
-                  </span>
+                  <ToggleAvailableButton id={p.id} available={p.is_available ?? true} />
                 </td>
                 <td>
                   <div className="admin-actions">

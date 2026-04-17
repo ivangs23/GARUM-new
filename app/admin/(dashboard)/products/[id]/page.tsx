@@ -9,7 +9,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
 
   const [{ data: product }, { data: categories }] = await Promise.all([
     supabase.from('products').select('*, product_extras(*)').eq('id', id).single(),
-    supabase.from('categories').select('id, name').order('sort_order'),
+    supabase.from('categories').select('id, name, parent_id').order('sort_order'),
   ]);
 
   if (!product) notFound();

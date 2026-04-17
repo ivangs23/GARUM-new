@@ -3,21 +3,39 @@
 import { CheckCircle, ArrowLeft, UtensilsCrossed } from "lucide-react";
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useRef } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useCart } from "@/context/CartContext";
+import { useLanguage } from "@/context/LanguageContext";
+
+type CartItem = { id: string; name: string; price: number; quantity: number };
 
 function SuccessContent() {
   const searchParams = useSearchParams();
   const mesa = searchParams.get('mesa') || '1';
-  const { items, totalAmount, clearCart } = useCart();
+  const { clearCart } = useCart();
+  const { t } = useLanguage();
 
-  const snapshot = useRef({ items: [...items], total: totalAmount });
+  // Leer localStorage de forma síncrona antes de que CartProvider lo limpie.
+  // useRef no sirve aquí: CartProvider carga items en useEffect (asíncrono),
+  // así que en el primer render items = []. El lazy initializer de useState
+  // se ejecuta en el mismo tick del primer render, antes de cualquier useEffect.
+  const [snapshot] = useState<{ items: CartItem[]; total: number }>(() => {
+    try {
+      const saved = localStorage.getItem('garum-cart');
+      if (saved) {
+        const items: CartItem[] = JSON.parse(saved);
+        const total = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+        return { items, total };
+      }
+    } catch { /* carrito corrupto — nada que mostrar */ }
+    return { items: [], total: 0 };
+  });
 
   useEffect(() => {
     clearCart();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const { items: orderItems, total: orderTotal } = snapshot.current;
+  const { items: orderItems, total: orderTotal } = snapshot;
 
   return (
     <div className="card">
@@ -27,14 +45,16 @@ function SuccessContent() {
         <CheckCircle size={52} color="#7B4F96" />
       </div>
 
-      <h1 className="serif title">¡Pedido confirmado!</h1>
-      <p className="subtitle">Mesa <strong>{mesa}</strong> · Tu comanda ya está en camino.</p>
+      <h1 className="serif title">{t('success.title')}</h1>
+      <p className="subtitle">
+        {t('success.tablePrefix')} <strong>{mesa}</strong> · {t('success.enRoute')}
+      </p>
 
       {orderItems.length > 0 && (
         <div className="summary">
           <div className="summary-head">
             <UtensilsCrossed size={14} />
-            <span>Resumen del pedido</span>
+            <span>{t('success.orderSummary')}</span>
           </div>
           <ul className="items">
             {orderItems.map((item, i) => (
@@ -46,14 +66,14 @@ function SuccessContent() {
             ))}
           </ul>
           <div className="total-row">
-            <span>Total pagado</span>
+            <span>{t('success.totalPaid')}</span>
             <strong>{orderTotal.toFixed(2)} €</strong>
           </div>
         </div>
       )}
 
       <Link href={`/${mesa}`} className="gold-button cta">
-        <ArrowLeft size={16} /> Volver a la carta
+        <ArrowLeft size={16} /> {t('success.backToMenu')}
       </Link>
 
       <style jsx>{`
@@ -160,7 +180,7 @@ export default function SuccessPage() {
       justifyContent: 'center',
       padding: '2rem 1rem',
     }}>
-      <Suspense fallback={<p style={{ color: 'var(--text-muted)' }}>Cargando…</p>}>
+      <Suspense fallback={<p style={{ color: 'var(--text-muted)' }}>…</p>}>
         <SuccessContent />
       </Suspense>
     </main>

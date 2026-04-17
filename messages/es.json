@@ -1,0 +1,33 @@
+{
+  "menu": {
+    "tableLabel": "MESA",
+    "welcomeTitle": "¿Qué te apetece hoy?",
+    "welcomeSubtitle": "Selecciona una categoría para empezar",
+    "dishes": "platos",
+    "searchPlaceholder": "Buscar plato o bebida...",
+    "backToCategories": "Explorar otras categorías",
+    "addToOrder": "Añadir al pedido",
+    "myOrder": "Mi Pedido",
+    "products": "productos",
+    "product": "producto",
+    "pay": "PAGAR",
+    "currentOrder": "Pedido en curso",
+    "confirmAndPay": "CONFIRMAR Y PAGAR",
+    "emptyCart": "Tu carrito está vacío",
+    "extras": "Extras",
+    "noResults": "Sin resultados para",
+    "emptyMenu": "La carta está vacía."
+  },
+  "success": {
+    "title": "¡Pedido confirmado!",
+    "tablePrefix": "Mesa",
+    "enRoute": "Tu comanda ya está en camino.",
+    "orderSummary": "Resumen del pedido",
+    "totalPaid": "Total pagado",
+    "backToMenu": "Volver a la carta",
+    "loading": "Cargando…"
+  },
+  "nav": {
+    "adminAccess": "Acceso Admin"
+  }
+}

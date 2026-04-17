@@ -2,14 +2,15 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Tag, UtensilsCrossed, QrCode, LogOut, ArrowLeft, X } from 'lucide-react';
+import { LayoutDashboard, Tag, UtensilsCrossed, QrCode, LogOut, ArrowLeft, X, Settings } from 'lucide-react';
 import { supabaseBrowser } from '@/lib/supabase-browser';
 
 const links = [
-  { href: '/admin',            label: 'Dashboard',  icon: LayoutDashboard, exact: true },
-  { href: '/admin/categories', label: 'Categorías', icon: Tag,              exact: false },
-  { href: '/admin/products',   label: 'Productos',  icon: UtensilsCrossed,  exact: false },
-  { href: '/admin/qr',         label: 'QR Mesas',   icon: QrCode,           exact: false },
+  { href: '/admin',            label: 'Dashboard',     icon: LayoutDashboard, exact: true },
+  { href: '/admin/categories', label: 'Categorías',    icon: Tag,             exact: false },
+  { href: '/admin/products',   label: 'Productos',     icon: UtensilsCrossed, exact: false },
+  { href: '/admin/qr',         label: 'QR Mesas',      icon: QrCode,          exact: false },
+  { href: '/admin/settings',   label: 'Configuración', icon: Settings,        exact: false },
 ];
 
 interface AdminNavProps {

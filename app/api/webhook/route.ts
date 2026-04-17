@@ -7,9 +7,6 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2026-03-25.dahlia' as any,
 });
 
-// Impedir que Next.js parsee el body — Stripe necesita el raw body para verificar la firma
-export const config = { api: { bodyParser: false } };
-
 export async function POST(req: Request) {
   const body = await req.text();
   const sig  = (await headers()).get('stripe-signature');
@@ -27,39 +24,57 @@ export async function POST(req: Request) {
   }
 
   if (event.type === 'checkout.session.completed') {
-    const session  = event.data.object as Stripe.Checkout.Session;
-    const orderId  = session.client_reference_id;
+    const session   = event.data.object as Stripe.Checkout.Session;
+    const orderId   = session.client_reference_id;
     const sessionId = session.id;
 
     if (!orderId) {
-      console.error('Webhook: client_reference_id vacío');
+      console.error('Webhook: client_reference_id vacío. Session:', sessionId);
       return NextResponse.json({ error: 'Missing order id' }, { status: 400 });
     }
 
-    // Deduplicación: comprobar si ya está marcado como pagado
-    const { data: existing } = await supabaseAdmin
-      .from('orders')
-      .select('payment_status')
-      .eq('id', orderId)
-      .single();
-
-    if (existing?.payment_status === 'paid') {
-      console.log(`Webhook: pedido ${orderId} ya estaba pagado, ignorando.`);
-      return NextResponse.json({ received: true });
-    }
-
-    // Marcar como pagado
-    const { error } = await supabaseAdmin
+    // Actualización atómica: solo actualiza si sigue en 'pending'.
+    // Si ya estaba pagado (webhook duplicado), no actualiza ninguna fila — sin race condition.
+    const { data: updated, error } = await supabaseAdmin
       .from('orders')
       .update({ payment_status: 'paid', stripe_session_id: sessionId })
-      .eq('id', orderId);
+      .eq('id', orderId)
+      .eq('payment_status', 'pending')
+      .select('id, table_number, total_amount, items');
 
     if (error) {
       console.error('Error actualizando pedido:', error);
       return NextResponse.json({ error: 'DB Update Failed' }, { status: 500 });
     }
 
-    console.log(`✅ Pedido ${orderId} marcado como pagado.`);
+    if (!updated || updated.length === 0) {
+      console.log(`Webhook: pedido ${orderId} ya procesado (o no existe), ignorando.`);
+    } else {
+      const order = updated[0] as any;
+      console.log(`✅ Pedido ${orderId} marcado como pagado.`);
+
+      // Insertar en `pedidos` para que el agente de impresora lo reciba vía realtime
+      const orderNumber = `P-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+      const orderType   = order.table_number ? 'mesa' : 'llevar';
+
+      const { error: pedidoError } = await supabaseAdmin
+        .from('pedidos')
+        .insert([{
+          order_number:  orderNumber,
+          order_type:    orderType,
+          table_number:  order.table_number ? String(order.table_number) : null,
+          total_amount:  order.total_amount,
+          status:        'paid',
+          items:         order.items,
+        }]);
+
+      if (pedidoError) {
+        console.error('Error insertando en pedidos:', pedidoError);
+        // No fallamos el webhook — el pago ya está registrado en orders
+      } else {
+        console.log(`✅ Pedido ${orderNumber} insertado en tabla pedidos.`);
+      }
+    }
   }
 
   return NextResponse.json({ received: true });

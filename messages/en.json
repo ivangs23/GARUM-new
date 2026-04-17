@@ -1,0 +1,33 @@
+{
+  "menu": {
+    "tableLabel": "TABLE",
+    "welcomeTitle": "What would you like today?",
+    "welcomeSubtitle": "Select a category to start",
+    "dishes": "dishes",
+    "searchPlaceholder": "Search for a dish or drink...",
+    "backToCategories": "Explore other categories",
+    "addToOrder": "Add to order",
+    "myOrder": "My Order",
+    "products": "items",
+    "product": "item",
+    "pay": "PAY",
+    "currentOrder": "Current order",
+    "confirmAndPay": "CONFIRM & PAY",
+    "emptyCart": "Your cart is empty",
+    "extras": "Extras",
+    "noResults": "No results for",
+    "emptyMenu": "The menu is empty."
+  },
+  "success": {
+    "title": "Order confirmed!",
+    "tablePrefix": "Table",
+    "enRoute": "Your order is on its way.",
+    "orderSummary": "Order summary",
+    "totalPaid": "Total paid",
+    "backToMenu": "Back to the menu",
+    "loading": "Loading…"
+  },
+  "nav": {
+    "adminAccess": "Admin Access"
+  }
+}

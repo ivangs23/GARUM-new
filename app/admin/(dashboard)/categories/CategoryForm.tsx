@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabaseBrowser as supabase } from '@/lib/supabase-browser';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
+import { buildCategoryTree, flattenTree, collectDescendantIds } from '@/lib/category-tree';
 
 type Category = {
   id?: string;
@@ -12,24 +13,58 @@ type Category = {
   destination: 'cocina' | 'barra';
   icon: string;
   sort_order: number;
+  parent_id: string | null;
 };
 
-export default function CategoryForm({ initial }: { initial?: Category }) {
+type CategoryFlat = { id: string; name: string; parent_id: string | null };
+
+export default function CategoryForm({
+  initial,
+  allCategories = [],
+  onSuccess,
+  onCancel,
+}: {
+  initial?: Category;
+  allCategories?: CategoryFlat[];
+  onSuccess?: () => void;
+  onCancel?: () => void;
+}) {
   const router = useRouter();
   const [form, setForm] = useState<Category>(initial ?? {
-    name: '', slug: '', destination: 'cocina', icon: '', sort_order: 0,
+    name: '', slug: '', destination: 'cocina', icon: '', sort_order: 0, parent_id: null,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const set = (k: keyof Category, v: string | number) =>
+  const set = (k: keyof Category, v: string | number | null) =>
     setForm(f => ({ ...f, [k]: v }));
 
   const autoSlug = (name: string) =>
     name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 
+  // Build indented options for the parent dropdown (excluding self + its descendants)
+  const descendantIds = initial?.id
+    ? collectDescendantIds({ ...initial as any, children: [] } as any)
+    : [];
+  const parentOptions = flattenTree(
+    buildCategoryTree(allCategories.filter(c => c.id !== initial?.id && !descendantIds.includes(c.id)))
+  );
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.slug.trim()) { setError('El slug no puede estar vacío.'); return; }
+
+    // Cycle guard: chosen parent must not be a descendant of this category
+    if (form.parent_id && initial?.id) {
+      const selfNode = buildCategoryTree(
+        allCategories.map(c => c.id === initial.id ? { ...c, parent_id: null } : c)
+      ).find(n => n.id === initial.id);
+      if (selfNode && collectDescendantIds(selfNode as any).includes(form.parent_id)) {
+        setError('No puedes seleccionar un descendiente como categoría padre.');
+        return;
+      }
+    }
+
     setLoading(true);
     setError('');
 
@@ -39,8 +74,7 @@ export default function CategoryForm({ initial }: { initial?: Category }) {
       : await supabase.from('categories').insert(payload);
 
     if (error) { setError(error.message); setLoading(false); return; }
-    router.push('/admin/categories');
-    router.refresh();
+    if (onSuccess) { onSuccess(); } else { router.push('/admin/categories'); router.refresh(); }
   };
 
   return (
@@ -66,6 +100,20 @@ export default function CategoryForm({ initial }: { initial?: Category }) {
           <select value={form.destination} onChange={e => set('destination', e.target.value as 'cocina' | 'barra')}>
             <option value="cocina">Cocina</option>
             <option value="barra">Barra</option>
+          </select>
+        </label>
+        <label>
+          Categoría padre
+          <select
+            value={form.parent_id ?? ''}
+            onChange={e => set('parent_id', e.target.value || null)}
+          >
+            <option value="">— Sin padre (raíz) —</option>
+            {parentOptions.map(c => (
+              <option key={c.id} value={c.id}>
+                {'\u00A0\u00A0'.repeat(c.depth)}{c.depth > 0 ? '└ ' : ''}{c.name}
+              </option>
+            ))}
           </select>
         </label>
       </div>
@@ -97,7 +145,7 @@ export default function CategoryForm({ initial }: { initial?: Category }) {
       {error && <p className="error-msg">{error}</p>}
 
       <div className="form-actions">
-        <button type="button" onClick={() => router.back()} className="btn-secondary">Cancelar</button>
+        <button type="button" onClick={() => onCancel ? onCancel() : router.back()} className="btn-secondary">Cancelar</button>
         <button type="submit" className="gold-button" disabled={loading}>
           {loading ? <Loader2 size={16} className="spin" /> : (initial ? 'Guardar cambios' : 'Crear categoría')}
         </button>
@@ -135,7 +183,6 @@ export default function CategoryForm({ initial }: { initial?: Category }) {
         }
         .icon-choice:hover { border-color: var(--primary); background: var(--primary-light); transform: scale(1.1); }
         .icon-choice.selected { border-color: var(--primary); background: var(--primary-light); box-shadow: 0 0 0 3px rgba(123, 79, 150, 0.1); }
-        
         .error-msg { color: #dc2626; font-size: 0.85rem; font-weight: 500; }
         .form-actions { display: flex; gap: 1rem; }
         .btn-secondary {

@@ -1,7 +1,9 @@
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import Link from 'next/link';
-import { Plus, Pencil, ChefHat, Wine } from 'lucide-react';
+import { Pencil, ChefHat, Wine } from 'lucide-react';
 import DeleteCategoryButton from './DeleteCategoryButton';
+import NewCategoryModal from './NewCategoryModal';
+import { buildCategoryTree, flattenTree } from '@/lib/category-tree';
 
 export default async function CategoriesPage() {
   const supabase = await createSupabaseServerClient();
@@ -10,13 +12,13 @@ export default async function CategoriesPage() {
     .select('*')
     .order('sort_order');
 
+  const flatNodes = flattenTree(buildCategoryTree(categories ?? []));
+
   return (
     <div>
       <div className="admin-page-header">
         <h1 className="admin-page-title">Categorías</h1>
-        <Link href="/admin/categories/new" className="admin-btn-sm">
-          <Plus size={16} /> Nueva categoría
-        </Link>
+        <NewCategoryModal allCategories={categories ?? []} />
       </div>
 
       <div className="admin-table-wrap">
@@ -31,9 +33,14 @@ export default async function CategoriesPage() {
             </tr>
           </thead>
           <tbody>
-            {categories?.map(cat => (
+            {flatNodes.map(cat => (
               <tr key={cat.id}>
-                <td><strong>{cat.name}</strong></td>
+                <td>
+                  <span style={{ paddingLeft: `${cat.depth * 1.5}rem`, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    {cat.depth > 0 && <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>└</span>}
+                    <strong>{cat.name}</strong>
+                  </span>
+                </td>
                 <td className="muted">{cat.slug}</td>
                 <td>
                   <span className={`admin-badge ${cat.destination}`}>

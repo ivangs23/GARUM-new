@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabaseBrowser as supabase } from '@/lib/supabase-browser';
-import { Printer, ChefHat, Wine, LogOut, CheckCircle } from 'lucide-react';
+import { Printer, ChefHat, Wine, LogOut, CheckCircle, Clock } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
-type OrderItem = { id: string; name: string; price: number; quantity: number };
+type OrderItem = { id: string; name: string; price: number; quantity: number; destination?: 'cocina' | 'barra' };
 
 type Order = {
   id: string;
@@ -14,21 +14,74 @@ type Order = {
   created_at: string;
   items: OrderItem[];
   destination: 'cocina' | 'barra' | 'all';
+  staff_status: 'pending' | 'done';
 };
 
-// Función de filtrado mejorada: usa el campo destination guardado en el pedido
-// Fallback a palabras clave solo si el pedido es antiguo y no tiene destination
+// Función de filtrado: usa destination del item (guardado en checkout)
+// con fallback a palabras clave para pedidos legacy
 function filterItems(items: any[], dest: 'cocina' | 'barra') {
   return items.filter(item => {
-    if (item.destination) {
-      return item.destination === dest;
-    }
-    // Fallback legacy logic
+    if (item.destination) return item.destination === dest;
     const isCocinaLegacy = !['vino', 'cerveza', 'café', 'cafe', 'copa', 'cóctel', 'coctel', 'agua', 'refresco', 'infusión'].some(kw =>
       item.name.toLowerCase().includes(kw)
     );
     return dest === 'cocina' ? isCocinaLegacy : !isCocinaLegacy;
   });
+}
+
+// Formatea tiempo transcurrido desde un timestamp
+function useElapsed(created_at: string) {
+  const [elapsed, setElapsed] = useState('');
+
+  useEffect(() => {
+    const update = () => {
+      const diff = Math.floor((Date.now() - new Date(created_at).getTime()) / 1000);
+      if (diff < 60)       setElapsed(`${diff}s`);
+      else if (diff < 3600) setElapsed(`${Math.floor(diff / 60)}min ${diff % 60}s`);
+      else                  setElapsed(`${Math.floor(diff / 3600)}h ${Math.floor((diff % 3600) / 60)}min`);
+    };
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [created_at]);
+
+  return elapsed;
+}
+
+// Componente de tarjeta de pedido con contador de tiempo
+function OrderCard({ order, dest, onDone }: { order: Order; dest: 'cocina' | 'barra'; onDone: (id: string) => void }) {
+  const elapsed = useElapsed(order.created_at);
+  const filtered = filterItems(order.items, dest);
+  const diffSecs = Math.floor((Date.now() - new Date(order.created_at).getTime()) / 1000);
+  const isUrgent = diffSecs > 600; // > 10 minutos
+
+  return (
+    <div className={`order-card ${isUrgent ? 'urgent' : ''}`}>
+      <div className="card-top">
+        <span className="mesa-pill">MESA {order.table_number}</span>
+        <div className="time-wrap">
+          <Clock size={12} />
+          <span className={`time ${isUrgent ? 'urgent-time' : ''}`}>{elapsed}</span>
+        </div>
+      </div>
+      <ul className="items-list">
+        {filtered.map((item, i) => (
+          <li key={i}>
+            <span className="qty">{item.quantity}×</span>
+            {item.name}
+          </li>
+        ))}
+      </ul>
+      <div className="card-actions">
+        <button className="print-btn" onClick={() => printTicket(order, dest)}>
+          <Printer size={15} /> IMPRIMIR
+        </button>
+        <button className="done-btn" onClick={() => onDone(order.id)}>
+          <CheckCircle size={15} /> LISTO
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function printTicket(order: Order, dest: 'cocina' | 'barra') {
@@ -74,26 +127,46 @@ export default function StaffPage() {
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [done, setDone] = useState<Set<string>>(new Set());
+  // Audios diferenciados por destino
+  const audioCocinaRef = useRef<HTMLAudioElement | null>(null);
+  const audioBarraRef  = useRef<HTMLAudioElement | null>(null);
 
   const fetchOrders = useCallback(async () => {
     const { data } = await supabase
       .from('orders')
       .select('*')
       .eq('payment_status', 'paid')
+      .neq('staff_status', 'done')
       .order('created_at', { ascending: false })
       .limit(50);
     setOrders(data ?? []);
   }, []);
 
   useEffect(() => {
+    // Pre-cargar audios para evitar delay en la primera notificación
+    audioCocinaRef.current = new Audio('/notification.mp3');
+    audioBarraRef.current  = new Audio('/notification.mp3');
+
     fetchOrders();
 
     const channel = supabase
       .channel('staff_orders')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, payload => {
         if (payload.new.payment_status === 'paid') {
-          setOrders(prev => [payload.new as Order, ...prev]);
-          new Audio('/notification.mp3').play().catch(() => {});
+          const newOrder = payload.new as Order;
+          setOrders(prev => [newOrder, ...prev]);
+
+          // Sonido diferenciado: cocina usa 1 beep, barra usa 2 beeps
+          const hasCocina = filterItems(newOrder.items ?? [], 'cocina').length > 0;
+          const hasBarra  = filterItems(newOrder.items ?? [], 'barra').length > 0;
+
+          if (hasCocina) {
+            audioCocinaRef.current?.play().catch(() => {});
+          }
+          if (hasBarra) {
+            // Segundo beep con pequeño delay para diferenciar
+            setTimeout(() => audioBarraRef.current?.play().catch(() => {}), hasCocina ? 600 : 0);
+          }
         }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, payload => {
@@ -108,10 +181,17 @@ export default function StaffPage() {
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+      audioCocinaRef.current = null;
+      audioBarraRef.current  = null;
+    };
   }, [fetchOrders]);
 
-  const markDone = (id: string) => setDone(prev => new Set([...prev, id]));
+  const markDone = async (id: string) => {
+    setDone(prev => new Set([...prev, id]));
+    await supabase.from('orders').update({ staff_status: 'done' }).eq('id', id);
+  };
 
   const activeOrders = orders.filter(o => !done.has(o.id));
 
@@ -149,35 +229,14 @@ export default function StaffPage() {
             </div>
 
             <div className="orders-list">
-              {col(dest).map(order => {
-                const filtered = filterItems(order.items, dest);
-                return (
-                  <div key={order.id + dest} className="order-card">
-                    <div className="card-top">
-                      <span className="mesa-pill">MESA {order.table_number}</span>
-                      <span className="time">
-                        {new Date(order.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                    <ul className="items-list">
-                      {filtered.map((item, i) => (
-                        <li key={i}>
-                          <span className="qty">{item.quantity}×</span>
-                          {item.name}
-                        </li>
-                      ))}
-                    </ul>
-                    <div className="card-actions">
-                      <button className="print-btn" onClick={() => printTicket(order, dest)}>
-                        <Printer size={15} /> IMPRIMIR
-                      </button>
-                      <button className="done-btn" onClick={() => markDone(order.id)}>
-                        <CheckCircle size={15} /> LISTO
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+              {col(dest).map(order => (
+                <OrderCard
+                  key={order.id + dest}
+                  order={order}
+                  dest={dest}
+                  onDone={markDone}
+                />
+              ))}
 
               {col(dest).length === 0 && (
                 <div className="empty-col">Sin pedidos pendientes</div>
@@ -211,12 +270,15 @@ export default function StaffPage() {
 
         .orders-list { display:flex; flex-direction:column; gap:0.75rem; }
 
-        .order-card { background:#141414; border:1px solid #222; border-radius:14px; padding:1.2rem; display:flex; flex-direction:column; gap:0.8rem; animation:slideIn 0.3s ease; }
+        .order-card { background:#141414; border:1px solid #222; border-radius:14px; padding:1.2rem; display:flex; flex-direction:column; gap:0.8rem; animation:slideIn 0.3s ease; transition:border-color 0.3s; }
+        .order-card.urgent { border-color:rgba(239,68,68,0.5); background:#1a0f0f; }
         @keyframes slideIn { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
 
         .card-top { display:flex; justify-content:space-between; align-items:center; }
         .mesa-pill { background:var(--primary); color:#000; padding:0.3rem 0.8rem; border-radius:6px; font-weight:900; font-size:1.1rem; letter-spacing:0.05em; }
+        .time-wrap { display:flex; align-items:center; gap:0.3rem; }
         .time { font-size:0.8rem; color:var(--text-muted); font-family:monospace; }
+        .urgent-time { color:#f87171; font-weight:700; }
 
         .items-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:0.4rem; font-family:monospace; font-size:0.9rem; border-top:1px solid #222; padding-top:0.8rem; }
         .qty { color:var(--primary); font-weight:700; margin-right:0.4rem; }
