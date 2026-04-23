@@ -82,6 +82,7 @@ type CatSectionProps = {
   items: CartItem[];
   removeItem: (id: CartItem["id"]) => void;
   labels: { decrease: string; increase: string };
+  renderChildren?: boolean;
 };
 
 function CategoryMenuSection({
@@ -92,6 +93,7 @@ function CategoryMenuSection({
   items,
   removeItem,
   labels,
+  renderChildren = true,
 }: CatSectionProps) {
   return (
     <section id={cat.slug} className={depth === 0 ? "cat-section" : "cat-subsection"}>
@@ -188,18 +190,19 @@ function CategoryMenuSection({
         </div>
       )}
 
-      {cat.children.map((child) => (
-        <CategoryMenuSection
-          key={child.id}
-          cat={child}
-          depth={depth + 1}
-          getQty={getQty}
-          openProduct={openProduct}
-          items={items}
-          removeItem={removeItem}
-          labels={labels}
-        />
-      ))}
+      {renderChildren &&
+        cat.children.map((child) => (
+          <CategoryMenuSection
+            key={child.id}
+            cat={child}
+            depth={depth + 1}
+            getQty={getQty}
+            openProduct={openProduct}
+            items={items}
+            removeItem={removeItem}
+            labels={labels}
+          />
+        ))}
 
       <style jsx>{`
         .cat-section {
@@ -407,7 +410,7 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
   const { mesa } = use(params);
 
   const [categories, setCategories] = useState<Category[]>([]);
-  const [activeCategory, setActiveCategory] = useState("");
+  const [categoryPath, setCategoryPath] = useState<string[]>([]);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
@@ -415,7 +418,6 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
   const [selectedExtras, setSelectedExtras] = useState<Extra[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const [view, setView] = useState<"categories" | "menu">("categories");
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [maintenance, setMaintenance] = useState<{ enabled: boolean; message: string } | null>(
@@ -515,7 +517,6 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
             (cat) => countSubtreeProducts(cat as unknown as CategoryNode<Category>) > 0
           ) as Category[];
           setCategories(roots);
-          setActiveCategory(roots[0]?.slug ?? "");
         }
       } catch (err) {
         console.error("Error cargando la carta:", err);
@@ -554,13 +555,10 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
     setSelectedProduct(null);
   };
 
-  const selectCategory = (slug: string) => {
-    setActiveCategory(slug);
-    setView("menu");
-    setTimeout(() => {
-      document.getElementById(slug)?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 100);
-  };
+  const goInto = (slug: string) => setCategoryPath((prev) => [...prev, slug]);
+  const goBack = () => setCategoryPath((prev) => prev.slice(0, -1));
+  const goHome = () => setCategoryPath([]);
+  const goToDepth = (depth: number) => setCategoryPath((prev) => prev.slice(0, depth));
 
   // Collect all products from the full tree (for search, featured, pairings)
   const collectProducts = (cats: Category[]): Product[] =>
@@ -606,16 +604,50 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
       )
     : [];
 
-  const activeRootRaw = categories.find((c) => c.slug === activeCategory) ?? null;
-  const activeRootHasWines = activeRootRaw ? categoryHasWines(activeRootRaw) : false;
-  const activeRootCategory: Category | null = activeRootRaw
-    ? filterTreeByWine(activeRootRaw, activeRootHasWines ? wineFilter : "all")
+  // Resuelve el nodo actual recorriendo el árbol con los slugs del path
+  const resolvePath = (tree: Category[], path: string[]): Category | null => {
+    let node: Category | null = null;
+    let list: Category[] = tree;
+    for (const slug of path) {
+      const next = list.find((c) => c.slug === slug);
+      if (!next) return null;
+      node = next;
+      list = next.children;
+    }
+    return node;
+  };
+
+  const atRoot = categoryPath.length === 0;
+  const rawCurrentCategory = atRoot ? null : resolvePath(categories, categoryPath);
+  const currentChildren: Category[] = atRoot ? categories : (rawCurrentCategory?.children ?? []);
+  const showGrid = currentChildren.length > 0;
+
+  // Breadcrumb: nodos a lo largo del path, para mostrar y navegar
+  const breadcrumb: Category[] = (() => {
+    const out: Category[] = [];
+    let list: Category[] = categories;
+    for (const slug of categoryPath) {
+      const node = list.find((c) => c.slug === slug);
+      if (!node) break;
+      out.push(node);
+      list = node.children;
+    }
+    return out;
+  })();
+
+  // Vinos: el filtro aplica si la categoría actual (o subárbol) tiene vinos
+  const currentHasWines = rawCurrentCategory ? categoryHasWines(rawCurrentCategory) : false;
+
+  // Categoría actual con productos filtrados por tipo de vino (si aplica)
+  const currentCategory: Category | null = rawCurrentCategory
+    ? filterTreeByWine(rawCurrentCategory, currentHasWines ? wineFilter : "all")
     : null;
 
   // Reset del filtro al cambiar de categoría raíz
+  const rootSlug = categoryPath[0] ?? "";
   useEffect(() => {
     setWineFilter("all");
-  }, [activeCategory]);
+  }, [rootSlug]);
 
   if (loading)
     return (
@@ -786,8 +818,7 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
               onClick={() => {
                 const next = !showSearch;
                 setShowSearch(next);
-                if (next) setView("menu");
-                else {
+                if (!next) {
                   setSearchInput("");
                   setSearch("");
                 }
@@ -816,8 +847,8 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
         )}
       </header>
 
-      {/* VISTA 1: GRID DE CATEGORÍAS (2x2 en móvil) */}
-      {view === "categories" && !search && (
+      {/* VISTA RAÍZ: GRID DE CATEGORÍAS PRINCIPALES */}
+      {!search && atRoot && (
         <main id="main" className="categories-grid-view">
           <div className="welcome-header">
             <h2 className="serif">{t("menu.welcomeTitle")}</h2>
@@ -872,7 +903,7 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
                 className="cat-card"
                 role="listitem"
                 aria-label={`${cat.name} — ${countSubtreeProducts(cat as unknown as CategoryNode<Category>)} ${t("menu.dishes")}`}
-                onClick={() => selectCategory(cat.slug)}
+                onClick={() => goInto(cat.slug)}
               >
                 <div className="cat-icon-wrap">
                   <span className="cat-icon-lg" aria-hidden="true">
@@ -890,21 +921,47 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
         </main>
       )}
 
-      {/* VISTA 2: LISTADO DE PRODUCTOS */}
-      {(view === "menu" || search) && (
+      {/* VISTA NAVEGACIÓN: subcategorías o productos de la categoría actual */}
+      {(!atRoot || search) && (
         <>
-          {/* Navegación de retorno (solo si no hay búsqueda) */}
+          {/* Navegación de retorno + breadcrumb (solo si no hay búsqueda) */}
           {!search && (
-            <nav className="category-nav">
-              <button className="category-item back-btn" onClick={() => setView("categories")}>
+            <nav className="category-nav" aria-label={t("menu.backToCategories")}>
+              <button
+                className="category-item back-btn"
+                onClick={categoryPath.length > 1 ? goBack : goHome}
+              >
                 <ArrowLeft size={16} />
                 <span>{t("menu.backToCategories")}</span>
               </button>
+              {breadcrumb.length > 0 && (
+                <ol className="breadcrumb" aria-label="breadcrumb">
+                  {breadcrumb.map((b, i) => {
+                    const isLast = i === breadcrumb.length - 1;
+                    return (
+                      <li key={b.id} aria-current={isLast ? "page" : undefined}>
+                        {i > 0 && (
+                          <span className="crumb-sep" aria-hidden="true">
+                            ›
+                          </span>
+                        )}
+                        {isLast ? (
+                          <span className="crumb current">{b.name}</span>
+                        ) : (
+                          <button type="button" className="crumb" onClick={() => goToDepth(i + 1)}>
+                            {b.name}
+                          </button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ol>
+              )}
             </nav>
           )}
 
           {/* Chips de filtro por tipo de vino — sólo si la categoría tiene vinos */}
-          {!search && activeRootHasWines && (
+          {!search && currentHasWines && !showGrid && (
             <div className="wine-filters" role="radiogroup" aria-label={t("menu.filtersTitle")}>
               <button
                 type="button"
@@ -1013,16 +1070,50 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
                 );
               })}
 
-            {/* Modo menú: árbol recursivo de la categoría activa */}
-            {!search && activeRootCategory && (
-              <CategoryMenuSection
-                cat={activeRootCategory}
-                getQty={getQty}
-                openProduct={openProduct}
-                items={items}
-                removeItem={removeItem}
-                labels={{ decrease: t("menu.decreaseQty"), increase: t("menu.increaseQty") }}
-              />
+            {/* Modo navegación: subcategorías como grid + productos directos */}
+            {!search && !atRoot && currentCategory && (
+              <>
+                {showGrid && (
+                  <div className="cat-grid cat-grid-sub" role="list">
+                    {currentChildren.map((child) => (
+                      <button
+                        key={child.id}
+                        type="button"
+                        className="cat-card"
+                        role="listitem"
+                        aria-label={`${child.name} — ${countSubtreeProducts(child as unknown as CategoryNode<Category>)} ${t("menu.dishes")}`}
+                        onClick={() => goInto(child.slug)}
+                      >
+                        <div className="cat-icon-wrap">
+                          <span className="cat-icon-lg" aria-hidden="true">
+                            {child.icon || "🍷"}
+                          </span>
+                        </div>
+                        <h3>{child.name}</h3>
+                        <span className="cat-count">
+                          {countSubtreeProducts(child as unknown as CategoryNode<Category>)}{" "}
+                          {t("menu.dishes")}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {currentCategory.products.length > 0 && (
+                  <CategoryMenuSection
+                    cat={currentCategory}
+                    getQty={getQty}
+                    openProduct={openProduct}
+                    items={items}
+                    removeItem={removeItem}
+                    labels={{
+                      decrease: t("menu.decreaseQty"),
+                      increase: t("menu.increaseQty"),
+                    }}
+                    renderChildren={false}
+                  />
+                )}
+              </>
             )}
 
             {search && searchResults.length === 0 && (
@@ -1031,7 +1122,7 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
                 <p>Sin resultados para &ldquo;{search}&rdquo;</p>
               </div>
             )}
-            {!search && !activeRootCategory && !loading && (
+            {!search && !atRoot && !currentCategory && !loading && (
               <div className="empty-search">
                 <ShoppingBag size={48} color="var(--text-muted)" />
                 <p>
@@ -1549,6 +1640,57 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
           color: var(--primary) !important;
           border-color: var(--primary) !important;
           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .breadcrumb {
+          display: flex;
+          align-items: center;
+          gap: 0.3rem;
+          list-style: none;
+          margin: 0;
+          padding: 0;
+          font-size: 0.8rem;
+          color: var(--text-muted);
+          flex-wrap: nowrap;
+          overflow-x: auto;
+          scrollbar-width: none;
+        }
+        .breadcrumb::-webkit-scrollbar {
+          display: none;
+        }
+        .breadcrumb li {
+          display: flex;
+          align-items: center;
+          gap: 0.3rem;
+          white-space: nowrap;
+        }
+        .crumb {
+          background: none;
+          border: none;
+          padding: 0.2rem 0.3rem;
+          color: var(--text-muted);
+          cursor: pointer;
+          font-size: inherit;
+          font-family: inherit;
+          border-radius: 6px;
+          transition: all 0.15s;
+        }
+        .crumb:hover {
+          color: var(--primary);
+          background: var(--primary-light);
+        }
+        .crumb.current {
+          color: var(--primary);
+          font-weight: 700;
+          padding: 0.2rem 0.3rem;
+        }
+        .crumb-sep {
+          color: var(--text-muted);
+          opacity: 0.6;
+        }
+
+        .cat-grid-sub {
+          margin-bottom: 1.5rem;
         }
 
         .category-item {
