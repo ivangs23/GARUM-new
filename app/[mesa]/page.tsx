@@ -1421,20 +1421,45 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
         }
         @media (max-width: 600px) {
           .navbar-content {
-            position: relative;
-            justify-content: center;
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.4rem max(0.8rem, env(safe-area-inset-right)) 0.4rem
+              max(0.8rem, env(safe-area-inset-left));
           }
           .brand {
-            position: absolute;
-            left: 50%;
-            transform: translateX(-50%);
+            grid-column: 2;
+            justify-self: center;
           }
           .nav-logo-img {
-            height: 84px;
+            height: 56px;
           }
           .navbar-right {
-            position: absolute;
-            right: max(1.2rem, env(safe-area-inset-right));
+            grid-column: 3;
+            justify-self: end;
+            gap: 0.4rem;
+          }
+          .table-badge {
+            font-size: 0.65rem;
+            padding: 0.25rem 0.5rem;
+          }
+          .icon-btn {
+            width: 38px;
+            height: 38px;
+          }
+        }
+        @media (max-width: 600px) {
+          .menu-container {
+            padding-top: calc(80px + env(safe-area-inset-top));
+          }
+        }
+        @media (max-width: 360px) {
+          .nav-logo-img {
+            height: 48px;
+          }
+          .table-badge {
+            display: none;
           }
         }
         .brand h1 {
@@ -1455,6 +1480,7 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
           border-radius: 6px;
           font-weight: 800;
           letter-spacing: 0.08em;
+          white-space: nowrap;
         }
         .icon-btn {
           background: none;
