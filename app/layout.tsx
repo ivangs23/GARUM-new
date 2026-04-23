@@ -1,22 +1,29 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
 import { CartProvider } from "@/context/CartProvider";
 import { LanguageProvider } from "@/context/LanguageContext";
 import "./globals.css";
 
-const inter = Inter({ 
+const inter = Inter({
   variable: "--font-inter",
-  subsets: ["latin"] 
+  subsets: ["latin"],
 });
 
-const playfair = Playfair_Display({ 
+const playfair = Playfair_Display({
   variable: "--font-playfair",
-  subsets: ["latin"] 
+  subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
   title: "Garum | Vinoteca & Cafetería",
   description: "Pedidos en mesa y pago online de forma sencilla y elegante.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#D6E8D2",
 };
 
 export default function RootLayout({
@@ -28,9 +35,7 @@ export default function RootLayout({
     <html lang="es" className={`${inter.variable} ${playfair.variable}`}>
       <body>
         <LanguageProvider>
-          <CartProvider>
-            {children}
-          </CartProvider>
+          <CartProvider>{children}</CartProvider>
         </LanguageProvider>
       </body>
     </html>
