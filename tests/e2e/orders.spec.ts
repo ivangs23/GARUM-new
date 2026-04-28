@@ -55,7 +55,7 @@ test('un nuevo pedido por evento orders:new se añade a la lista', async () => {
   await expect(window.getByText('Copa Vino')).toBeVisible();
 });
 
-test('marcar como LISTO retira la card del pedido', async () => {
+test('marcar como LISTO deja la card visible y atenuada', async () => {
   const { app: electronApp, window } = app;
   await waitOrdersReady(window);
 
@@ -65,16 +65,16 @@ test('marcar como LISTO retira la card del pedido', async () => {
   await pushFromMain(electronApp, 'orders:init', [sampleOrder]);
   await expect(window.getByText('Croquetas')).toBeVisible();
 
-  // Hay un botón LISTO por columna donde aparece la mesa.
-  // Pulsamos el primero (columna COCINA) y verificamos que esa card desaparece.
   const cocinaColumn = window.locator('section', { hasText: 'COCINA' });
   await cocinaColumn.getByRole('button', { name: /LISTO/ }).click();
 
-  // El item de cocina ya no debe estar visible
-  await expect(cocinaColumn.getByText('Croquetas')).toHaveCount(0);
+  // La card sigue visible pero marcada como done (atenuada)
+  await expect(cocinaColumn.locator('[data-done="true"]')).toBeVisible();
+  // El botón LISTO de esa card ya no debe existir en la columna cocina
+  await expect(cocinaColumn.getByRole('button', { name: /LISTO/ })).toHaveCount(0);
 });
 
-test('un pedido con staff_status=done desaparece (orders:removed)', async () => {
+test('un pedido eliminado por orders:removed desaparece de la vista', async () => {
   const { app: electronApp, window } = app;
   await waitOrdersReady(window);
 
