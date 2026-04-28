@@ -123,29 +123,38 @@ function scheduleReconnect(): void {
 function handleChange(order: Order, win: BrowserWindow): void {
   if (!order?.id) return;
 
-  const isActive = order.payment_status === 'paid' && order.staff_status !== 'done';
+  // Solo nos importan los cambios de hoy. Los de días anteriores se consultan
+  // bajo demanda en la pestaña Historial.
+  if (!isToday(order.created_at)) return;
 
-  if (isActive) {
-    const isNew = !orders.has(order.id);
-    orders.set(order.id, order);
-    win.webContents.send(IPC.ORDERS_NEW, order);
-
-    if (isNew) {
-      updateTrayStatus('new-order');
-      notify(order);
-      setTimeout(() => updateTrayStatus('connected'), 8000);
-
-      // Imprimir en las impresoras configuradas (sin bloquear el flujo)
-      const { printers } = loadConfig();
-      if (printers.length > 0) {
-        printOrder(order, printers).catch(err =>
-          console.error('[Realtime] Error al imprimir:', err),
-        );
-      }
+  // Pedidos cancelados de hoy → quitar del cache (no se muestran en panel principal).
+  if (order.payment_status === 'cancelled') {
+    if (orders.has(order.id)) {
+      orders.delete(order.id);
+      win.webContents.send(IPC.ORDERS_REMOVED, order.id);
     }
-  } else {
-    orders.delete(order.id);
-    win.webContents.send(IPC.ORDERS_REMOVED, order.id);
+    return;
+  }
+
+  // Pedidos paid de hoy → upsert en cache, notificar.
+  if (order.payment_status !== 'paid') return;
+
+  const isNew = !orders.has(order.id);
+  orders.set(order.id, order);
+  win.webContents.send(IPC.ORDERS_NEW, order);
+
+  // Notificación + impresión solo en pedidos *recién entrantes* y aún pendientes.
+  if (isNew && order.staff_status !== 'done') {
+    updateTrayStatus('new-order');
+    notify(order);
+    setTimeout(() => updateTrayStatus('connected'), 8000);
+
+    const { printers } = loadConfig();
+    if (printers.length > 0) {
+      printOrder(order, printers).catch(err =>
+        console.error('[Realtime] Error al imprimir:', err),
+      );
+    }
   }
 }
 
@@ -153,7 +162,8 @@ function handleChange(order: Order, win: BrowserWindow): void {
 
 export async function markOrderDone(id: string): Promise<void> {
   if (!supabase) return;
-  orders.delete(id);
+  // No tocamos `orders` aquí — la actualización en BD genera un postgres_changes
+  // que reentra por handleChange y deja el pedido con staff_status='done' en cache.
   const { error } = await supabase
     .from('orders')
     .update({ staff_status: 'done' })
@@ -162,9 +172,13 @@ export async function markOrderDone(id: string): Promise<void> {
 }
 
 export function getOrders(): Order[] {
-  return [...orders.values()].sort(
-    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-  );
+  return [...orders.values()].sort((a, b) => {
+    // pending arriba, done al fondo
+    if (a.staff_status !== b.staff_status) {
+      return a.staff_status === 'done' ? 1 : -1;
+    }
+    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+  });
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
