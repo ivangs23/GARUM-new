@@ -20,3 +20,15 @@ export function startOfTodayMadridIso(now: Date = new Date()): string {
   const todayMidnightUtc = new Date(now.getTime() - elapsedMs);
   return todayMidnightUtc.toISOString();
 }
+
+const madridDayFmt = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Europe/Madrid',
+  year: 'numeric', month: '2-digit', day: '2-digit',
+});
+
+/**
+ * Devuelve true si `iso` cae en el mismo día Madrid que `now`.
+ */
+export function isToday(iso: string, now: Date = new Date()): boolean {
+  return madridDayFmt.format(new Date(iso)) === madridDayFmt.format(now);
+}

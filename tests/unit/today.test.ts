@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { startOfTodayMadridIso } from '../../src/main/today';
+import { startOfTodayMadridIso, isToday } from '../../src/main/today';
 
 describe('startOfTodayMadridIso', () => {
   it('devuelve 00:00 Madrid en formato ISO UTC para una fecha en CEST (verano)', () => {
@@ -28,5 +28,25 @@ describe('startOfTodayMadridIso', () => {
     // Inicio de "hoy" Madrid = 15 jun 22:00 UTC
     const now = new Date('2026-06-15T23:30:00Z');
     expect(startOfTodayMadridIso(now)).toBe('2026-06-15T22:00:00.000Z');
+  });
+});
+
+describe('isToday', () => {
+  it('true cuando created_at y now caen en el mismo día Madrid', () => {
+    const now = new Date('2026-06-15T14:30:00Z'); // 16:30 Madrid CEST
+    expect(isToday('2026-06-15T08:00:00Z', now)).toBe(true); // 10:00 Madrid mismo día
+  });
+
+  it('false cuando created_at es de ayer Madrid', () => {
+    const now = new Date('2026-06-15T10:00:00Z'); // 12:00 Madrid
+    expect(isToday('2026-06-14T20:00:00Z', now)).toBe(false); // 22:00 ayer Madrid
+  });
+
+  it('considera el cruce de medianoche local correctamente', () => {
+    const now = new Date('2026-06-15T22:30:00Z'); // 00:30 del 16 jun Madrid
+    // Un pedido a las 23:30 UTC = 01:30 del 16 jun Madrid → mismo día Madrid
+    expect(isToday('2026-06-15T23:30:00Z', now)).toBe(true);
+    // Un pedido a las 21:30 UTC = 23:30 del 15 jun Madrid → día anterior Madrid
+    expect(isToday('2026-06-15T21:30:00Z', now)).toBe(false);
   });
 });
