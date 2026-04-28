@@ -44,6 +44,10 @@ const api = {
 
   testPrinter: (config: PrinterConfig): Promise<void> =>
     ipcRenderer.invoke(IPC.PRINTERS_TEST, config),
+
+  // ── Historial ─────────────────────────────────────────────────────────────
+  listHistory: (limit: number, offset: number): Promise<Order[]> =>
+    ipcRenderer.invoke(IPC.HISTORY_LIST, { limit, offset }),
 };
 
 contextBridge.exposeInMainWorld('api', api);

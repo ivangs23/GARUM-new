@@ -66,4 +66,5 @@ export const IPC = {
   PRINTERS_LIST_WINDOWS:   'printers:list-windows',
   PRINTERS_SCAN_NETWORK:   'printers:scan-network',
   PRINTERS_TEST:           'printers:test',
+  HISTORY_LIST:            'history:list',
 } as const;
