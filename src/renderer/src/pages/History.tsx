@@ -3,21 +3,25 @@ import type { Order } from '../../../shared/types';
 
 const PAGE_SIZE = 50;
 
-function dayLabel(iso: string): string {
-  const d = new Date(iso);
-  const today = new Date();
-  const yesterday = new Date(today.getTime() - 24 * 3600 * 1000);
-  const sameDay = (a: Date, b: Date) =>
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate();
-  if (sameDay(d, today)) return 'Hoy';
-  if (sameDay(d, yesterday)) return 'Ayer';
-  return d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' });
-}
+const madridDayFmt = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Europe/Madrid',
+  year: 'numeric', month: '2-digit', day: '2-digit',
+});
 
 function dayKey(iso: string): string {
-  return iso.slice(0, 10); // YYYY-MM-DD UTC; agrupación aproximada que basta para listar
+  // YYYY-MM-DD en zona Madrid: garantiza agrupación correcta para pedidos de madrugada.
+  return madridDayFmt.format(new Date(iso));
+}
+
+function dayLabel(iso: string): string {
+  const k = dayKey(iso);
+  const todayKey     = dayKey(new Date().toISOString());
+  const yesterdayKey = dayKey(new Date(Date.now() - 24 * 3600 * 1000).toISOString());
+  if (k === todayKey)     return 'Hoy';
+  if (k === yesterdayKey) return 'Ayer';
+  return new Date(iso).toLocaleDateString('es-ES', {
+    weekday: 'long', day: 'numeric', month: 'short', timeZone: 'Europe/Madrid',
+  });
 }
 
 function HistoryCard({ order }: { order: Order }) {
@@ -50,19 +54,25 @@ function HistoryCard({ order }: { order: Order }) {
 export default function History() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [offset, setOffset]   = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
+  const inFlight = useRef(false);
   const loadPage = useCallback(async (currentOffset: number) => {
-    if (loading || !hasMore) return;
+    if (inFlight.current || !hasMore) return;
+    inFlight.current = true;
     setLoading(true);
-    const page = await window.api.listHistory(PAGE_SIZE, currentOffset);
-    setOrders(prev => [...prev, ...page]);
-    setOffset(currentOffset + page.length);
-    if (page.length < PAGE_SIZE) setHasMore(false);
-    setLoading(false);
-  }, [loading, hasMore]);
+    try {
+      const page = await window.api.listHistory(PAGE_SIZE, currentOffset);
+      setOrders(prev => [...prev, ...page]);
+      setOffset(currentOffset + page.length);
+      if (page.length < PAGE_SIZE) setHasMore(false);
+    } finally {
+      inFlight.current = false;
+      setLoading(false);
+    }
+  }, [hasMore]);
 
   useEffect(() => {
     loadPage(0);
