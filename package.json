@@ -9,6 +9,8 @@
     "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.web.json --noEmit",
     "gen-icons": "node scripts/gen-icons.cjs",
     "dist:win": "npm run gen-icons && npm run build && electron-builder --win",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
     "pretest:e2e": "npm run build",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
@@ -73,6 +75,7 @@
     "react": "^19",
     "react-dom": "^19",
     "typescript": "^5",
-    "vite": "^5"
+    "vite": "^5",
+    "vitest": "^1.6.1"
   }
 }
