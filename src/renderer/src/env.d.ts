@@ -17,6 +17,7 @@ declare global {
       listWindowsPrinters:  ()                          => Promise<DiscoveredPrinter[]>;
       scanNetworkPrinters:  ()                          => Promise<DiscoveredPrinter[]>;
       testPrinter:          (c: PrinterConfig)          => Promise<void>;
+      listHistory:          (limit: number, offset: number) => Promise<Order[]>;
     };
   }
 }
