@@ -4,7 +4,7 @@
   "description": "Panel de comandas y gestión de impresoras — Garum Vinoteca",
   "main": "out/main/index.js",
   "scripts": {
-    "dev": "electron-vite dev",
+    "dev": "ELECTRON_RUN_AS_NODE= electron-vite dev",
     "build": "electron-vite build",
     "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.web.json --noEmit",
     "gen-icons": "node scripts/gen-icons.cjs",
