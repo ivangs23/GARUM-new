@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { startOfTodayMadridIso, isToday } from '../../src/main/today';
+import { startOfTodayMadridIso, isToday, msUntilNextMidnightMadrid } from '../../src/main/today';
 
 describe('startOfTodayMadridIso', () => {
   it('devuelve 00:00 Madrid en formato ISO UTC para una fecha en CEST (verano)', () => {
@@ -48,5 +48,33 @@ describe('isToday', () => {
     expect(isToday('2026-06-15T23:30:00Z', now)).toBe(true);
     // Un pedido a las 21:30 UTC = 23:30 del 15 jun Madrid → día anterior Madrid
     expect(isToday('2026-06-15T21:30:00Z', now)).toBe(false);
+  });
+});
+
+describe('msUntilNextMidnightMadrid', () => {
+  it('a mediodía Madrid devuelve 12h en ms', () => {
+    // 15 jun 2026 10:00 UTC = 12:00 Madrid CEST → faltan 12h
+    const now = new Date('2026-06-15T10:00:00Z');
+    expect(msUntilNextMidnightMadrid(now)).toBe(12 * 60 * 60 * 1000);
+  });
+
+  it('a las 23:30 Madrid devuelve 30 min en ms', () => {
+    // 15 jun 2026 21:30 UTC = 23:30 Madrid CEST → faltan 30 min
+    const now = new Date('2026-06-15T21:30:00Z');
+    expect(msUntilNextMidnightMadrid(now)).toBe(30 * 60 * 1000);
+  });
+
+  it('siempre devuelve un valor en (0, 25h]', () => {
+    const moments = [
+      '2026-01-01T00:00:00Z',
+      '2026-03-29T00:30:00Z', // día spring-forward CET→CEST
+      '2026-10-25T01:30:00Z', // día fall-back CEST→CET
+      '2026-12-31T23:59:00Z',
+    ];
+    for (const iso of moments) {
+      const ms = msUntilNextMidnightMadrid(new Date(iso));
+      expect(ms).toBeGreaterThan(0);
+      expect(ms).toBeLessThanOrEqual(25 * 60 * 60 * 1000);
+    }
   });
 });

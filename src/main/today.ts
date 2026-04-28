@@ -32,3 +32,14 @@ const madridDayFmt = new Intl.DateTimeFormat('en-CA', {
 export function isToday(iso: string, now: Date = new Date()): boolean {
   return madridDayFmt.format(new Date(iso)) === madridDayFmt.format(now);
 }
+
+/**
+ * Milisegundos hasta la próxima medianoche Madrid. Maneja DST porque usa
+ * `startOfTodayMadridIso` con una fecha 25h adelante desde la medianoche actual.
+ */
+export function msUntilNextMidnightMadrid(now: Date = new Date()): number {
+  const todayMidnight = new Date(startOfTodayMadridIso(now));
+  const ahead25h = new Date(todayMidnight.getTime() + 25 * 60 * 60 * 1000);
+  const tomorrowMidnight = new Date(startOfTodayMadridIso(ahead25h));
+  return tomorrowMidnight.getTime() - now.getTime();
+}
