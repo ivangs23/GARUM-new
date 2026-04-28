@@ -28,3 +28,10 @@ test('sin pedidos muestra los placeholders en ambas columnas', async () => {
   const empties = window.getByText('Sin pedidos pendientes');
   await expect(empties).toHaveCount(2);
 });
+
+test('navega a la pestaña Historial desde el sidebar', async () => {
+  const { window } = app;
+
+  await window.getByRole('button', { name: /Historial/ }).click();
+  await expect(window.getByRole('heading', { name: 'Historial' })).toBeVisible();
+});

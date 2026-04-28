@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import Orders  from './pages/Orders';
 import Settings from './pages/Settings';
+import History from './pages/History';
 
-type Page = 'orders' | 'settings';
+type Page = 'orders' | 'history' | 'settings';
 
 export default function App() {
   const [page, setPage] = useState<Page>('orders');
@@ -41,7 +42,11 @@ export default function App() {
 
         {/* Navegación */}
         <nav style={{ flex: 1, padding: '1rem 0' }}>
-          {([['orders', '🍽 Comandas'], ['settings', '⚙️ Configuración']] as [Page, string][]).map(([p, label]) => (
+          {([
+            ['orders',   '🍽 Comandas'],
+            ['history',  '📜 Historial'],
+            ['settings', '⚙️ Configuración'],
+          ] as [Page, string][]).map(([p, label]) => (
             <button
               key={p}
               onClick={() => setPage(p)}
@@ -78,7 +83,9 @@ export default function App() {
 
       {/* Contenido */}
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {page === 'orders' ? <Orders /> : <Settings onSaved={() => setPage('orders')} />}
+        {page === 'orders'   && <Orders />}
+        {page === 'history'  && <History />}
+        {page === 'settings' && <Settings onSaved={() => setPage('orders')} />}
       </main>
     </div>
   );
