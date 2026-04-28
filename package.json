@@ -8,7 +8,10 @@
     "build": "electron-vite build",
     "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.web.json --noEmit",
     "gen-icons": "node scripts/gen-icons.cjs",
-    "dist:win": "npm run gen-icons && npm run build && electron-builder --win"
+    "dist:win": "npm run gen-icons && npm run build && electron-builder --win",
+    "pretest:e2e": "npm run build",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "build": {
     "appId": "es.garum.vinoteca.desktop",
@@ -25,11 +28,21 @@
       {
         "from": "resources",
         "to": "resources",
-        "filter": ["*.png", "*.ico"]
+        "filter": [
+          "*.png",
+          "*.ico"
+        ]
       }
     ],
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "resources/icon.ico"
     },
     "nsis": {
@@ -48,6 +61,7 @@
   "devDependencies": {
     "@electron-toolkit/preload": "^3.0.0",
     "@electron-toolkit/utils": "^3.0.0",
+    "@playwright/test": "^1.59.1",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -55,6 +69,7 @@
     "electron": "^33",
     "electron-builder": "^25",
     "electron-vite": "^2",
+    "playwright": "^1.59.1",
     "react": "^19",
     "react-dom": "^19",
     "typescript": "^5",

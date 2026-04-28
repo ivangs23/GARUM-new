@@ -20,15 +20,18 @@ app.whenReady().then(async () => {
   setupIpc(mainWindow);
 
   const config = loadConfig();
+  const isE2E  = process.env.GARUM_E2E === '1';
 
-  // Auto-arranque con Windows
-  app.setLoginItemSettings({
-    openAtLogin: config.autoLaunch,
-    name: 'Garum Desktop',
-  });
+  // Auto-arranque con Windows (omitir en E2E)
+  if (!isE2E) {
+    app.setLoginItemSettings({
+      openAtLogin: config.autoLaunch,
+      name: 'Garum Desktop',
+    });
+  }
 
-  // Conectar Realtime si ya hay credenciales guardadas
-  if (config.supabaseUrl && config.supabaseKey) {
+  // Conectar Realtime si ya hay credenciales guardadas (omitir en E2E)
+  if (!isE2E && config.supabaseUrl && config.supabaseKey) {
     await startRealtimeListener(config.supabaseUrl, config.supabaseKey, mainWindow);
   }
 });
