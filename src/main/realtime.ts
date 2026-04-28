@@ -5,6 +5,7 @@ import { updateTrayStatus } from './tray';
 import { loadConfig } from './config';
 import { printOrder } from './printer';
 import { IPC, type Order, type ConnectionStatus } from '../shared/types';
+import { startOfTodayMadridIso, isToday, msUntilNextMidnightMadrid } from './today';
 
 let supabase: SupabaseClient | null = null;
 let channel: RealtimeChannel | null = null;
@@ -35,14 +36,26 @@ export async function startRealtimeListener(
 
   sendStatus(win, 'connecting');
 
-  // Carga inicial de pedidos pendientes
-  const { data, error } = await supabase
-    .from('orders')
-    .select('*')
-    .eq('payment_status', 'paid')
-    .neq('staff_status', 'done')
-    .order('created_at', { ascending: true })
-    .limit(100);
+  // Carga inicial de pedidos de HOY (paid, sea cual sea staff_status)
+  const startToday = startOfTodayMadridIso();
+  let data: Order[] | null = null;
+  let error: { message: string } | null = null;
+  try {
+    const res = await supabase
+      .from('orders')
+      .select('*')
+      .eq('payment_status', 'paid')
+      .gte('created_at', startToday)
+      .order('created_at', { ascending: true })
+      .limit(200);
+    data = res.data as Order[] | null;
+    error = res.error;
+  } catch (e) {
+    console.error('[Realtime] EXCEPCIÓN en fetch inicial:', e);
+    sendStatus(win, 'disconnected');
+    scheduleReconnect();
+    return;
+  }
 
   if (error) {
     console.error('[Realtime] Error cargando pedidos iniciales:', error.message);
@@ -51,7 +64,7 @@ export async function startRealtimeListener(
   }
 
   orders.clear();
-  (data as Order[]).forEach(o => orders.set(o.id, o));
+  (data ?? []).forEach(o => orders.set(o.id, o));
   win.webContents.send(IPC.ORDERS_INIT, [...orders.values()]);
 
   // Suscripción Realtime
