@@ -38,29 +38,38 @@ function OrderCard({ order, dest, onDone }: {
   dest: 'cocina' | 'barra';
   onDone: (id: string) => void;
 }) {
+  const isDone   = order.staff_status === 'done';
   const elapsed  = useElapsed(order.created_at);
   const items    = filterItems(order.items, dest);
   const secs     = Math.floor((Date.now() - new Date(order.created_at).getTime()) / 1000);
-  const isUrgent = secs > 600;
+  const isUrgent = !isDone && secs > 600;
 
   return (
-    <div style={{
-      background: isUrgent ? '#1a0f0f' : 'var(--surface)',
-      border: `1px solid ${isUrgent ? 'rgba(239,68,68,.5)' : 'var(--border)'}`,
-      borderRadius: 14, padding: '1rem', display: 'flex', flexDirection: 'column',
-      gap: '0.75rem', animation: 'slideIn 0.25s ease',
-    }}>
+    <div
+      data-done={isDone ? 'true' : 'false'}
+      style={{
+        background: isDone ? '#0e0e0e' : isUrgent ? '#1a0f0f' : 'var(--surface)',
+        border: `1px solid ${isDone ? 'var(--border)' : isUrgent ? 'rgba(239,68,68,.5)' : 'var(--border)'}`,
+        borderRadius: 14, padding: '1rem', display: 'flex', flexDirection: 'column',
+        gap: '0.75rem', animation: 'slideIn 0.25s ease',
+        opacity: isDone ? 0.5 : 1,
+      }}>
       {/* Cabecera */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{
-          background: 'var(--primary)', color: '#fff',
+          background: isDone ? 'var(--muted)' : 'var(--primary)', color: '#fff',
           padding: '0.25rem 0.75rem', borderRadius: 6,
           fontWeight: 900, fontSize: '1.1rem',
         }}>
           MESA {order.table_number}
         </span>
-        <span style={{ fontSize: '0.78rem', color: isUrgent ? 'var(--red)' : 'var(--muted)', fontFamily: 'monospace', fontWeight: isUrgent ? 700 : 400 }}>
-          ⏱ {elapsed}
+        <span style={{
+          fontSize: '0.78rem',
+          color: isDone ? 'var(--muted)' : isUrgent ? 'var(--red)' : 'var(--muted)',
+          fontFamily: 'monospace',
+          fontWeight: isUrgent ? 700 : 400,
+        }}>
+          {isDone ? `✓ ${new Date(order.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : `⏱ ${elapsed}`}
         </span>
       </div>
 
@@ -68,27 +77,29 @@ function OrderCard({ order, dest, onDone }: {
       <ul style={{ listStyle: 'none', borderTop: '1px solid var(--border)', paddingTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
         {items.map((item, i) => (
           <li key={i} style={{ fontFamily: 'monospace', fontSize: '0.9rem', display: 'flex', gap: '0.5rem' }}>
-            <span style={{ color: 'var(--primary)', fontWeight: 700, minWidth: 24 }}>{item.quantity}×</span>
+            <span style={{ color: isDone ? 'var(--muted)' : 'var(--primary)', fontWeight: 700, minWidth: 24 }}>{item.quantity}×</span>
             <span>{item.name}</span>
           </li>
         ))}
       </ul>
 
-      {/* Acciones */}
-      <button
-        onClick={() => onDone(order.id)}
-        style={{
-          background: 'rgba(74,222,128,.1)', border: '1px solid rgba(74,222,128,.3)',
-          borderRadius: 8, color: 'var(--green)', padding: '0.5rem',
-          fontWeight: 600, fontSize: '0.8rem', letterSpacing: '0.05em',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
-          transition: 'all 0.15s',
-        }}
-        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(74,222,128,.2)')}
-        onMouseLeave={e => (e.currentTarget.style.background = 'rgba(74,222,128,.1)')}
-      >
-        ✓ LISTO
-      </button>
+      {/* Acción solo en pendientes */}
+      {!isDone && (
+        <button
+          onClick={() => onDone(order.id)}
+          style={{
+            background: 'rgba(74,222,128,.1)', border: '1px solid rgba(74,222,128,.3)',
+            borderRadius: 8, color: 'var(--green)', padding: '0.5rem',
+            fontWeight: 600, fontSize: '0.8rem', letterSpacing: '0.05em',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
+            transition: 'all 0.15s',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(74,222,128,.2)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(74,222,128,.1)')}
+        >
+          ✓ LISTO
+        </button>
+      )}
     </div>
   );
 }
@@ -100,7 +111,9 @@ function Column({ dest, orders, onDone }: {
   orders: Order[];
   onDone: (id: string) => void;
 }) {
-  const active = orders.filter(o => filterItems(o.items, dest).length > 0);
+  const active  = orders.filter(o => filterItems(o.items, dest).length > 0);
+  const pending = active.filter(o => o.staff_status !== 'done');
+  const done    = active.filter(o => o.staff_status === 'done');
 
   const colors = {
     cocina: { bg: 'rgba(251,146,60,.08)', border: 'rgba(251,146,60,.25)', text: '#fb923c' },
@@ -131,10 +144,13 @@ function Column({ dest, orders, onDone }: {
 
       {/* Pedidos */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', overflowY: 'auto' }}>
-        {active.map(o => (
+        {pending.map(o => (
           <OrderCard key={o.id + dest} order={o} dest={dest} onDone={onDone} />
         ))}
-        {active.length === 0 && (
+        {done.map(o => (
+          <OrderCard key={o.id + dest} order={o} dest={dest} onDone={onDone} />
+        ))}
+        {pending.length === 0 && done.length === 0 && (
           <div style={{
             textAlign: 'center', padding: '2.5rem 1rem',
             color: 'var(--muted)', fontSize: '0.85rem',
@@ -183,7 +199,10 @@ export default function Orders() {
   }, [upsert, remove]);
 
   const markDone = async (id: string) => {
-    remove(id);
+    // No quitamos de la lista local: el pedido sigue visible atenuado.
+    // El main process actualizará staff_status='done' en BD; el evento de
+    // Realtime devolverá un upsert con staff_status='done' que ya gestiona upsert.
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, staff_status: 'done' } : o));
     await window.api.markDone(id);
   };
 
