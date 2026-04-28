@@ -1,7 +1,8 @@
 import { ipcMain, BrowserWindow } from 'electron';
-import { getOrders, markOrderDone } from './realtime';
+import { getOrders, markOrderDone, getSupabase } from './realtime';
 import { loadConfig, saveConfig } from './config';
 import { printOrderTicket, listWindowsPrinters, scanNetworkPrinters } from './printer';
+import { listHistory } from './history';
 import { IPC, type AppConfig, type PrinterConfig, type Order } from '../shared/types';
 
 export function setupIpc(win: BrowserWindow): void {
@@ -43,5 +44,10 @@ export function setupIpc(win: BrowserWindow): void {
       created_at: new Date().toISOString(),
     };
     await printOrderTicket(testOrder, printerConfig);
+  });
+
+  // ── Historial ─────────────────────────────────────────────────────────────
+  ipcMain.handle(IPC.HISTORY_LIST, async (_e, args: { limit: number; offset: number }) => {
+    return listHistory(getSupabase(), args.limit, args.offset);
   });
 }

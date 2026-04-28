@@ -174,3 +174,8 @@ function notify(order: Order): void {
     // Las notificaciones pueden fallar si el OS no las soporta
   }
 }
+
+/** Devuelve la instancia activa de Supabase (puede ser null si aún no conectado). */
+export function getSupabase() {
+  return supabase;
+}
