@@ -18,6 +18,7 @@ let savedUrl  = '';
 let savedKey  = '';
 let savedWin: BrowserWindow | null = null;
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
+let midnightTimer: ReturnType<typeof setTimeout> | null = null;
 let retryDelay = 5000; // ms — se duplica en cada fallo, máx 60 s
 
 // ─── Conexión ────────────────────────────────────────────────────────────────
@@ -79,7 +80,8 @@ export async function startRealtimeListener(
       if (status === 'SUBSCRIBED') {
         retryDelay = 5000; // reset backoff al conectar con éxito
         sendStatus(win, 'connected');
-      } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+        scheduleMidnightRollover(win);
+      } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
         sendStatus(win, 'disconnected');
         scheduleReconnect();
       }
@@ -88,6 +90,7 @@ export async function startRealtimeListener(
 
 export function stopRealtimeListener(): void {
   if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+  if (midnightTimer) { clearTimeout(midnightTimer); midnightTimer = null; }
   if (channel && supabase) {
     try { supabase.removeChannel(channel); } catch { /* ignorar */ }
     channel = null;
@@ -179,6 +182,42 @@ export function getOrders(): Order[] {
     }
     return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
   });
+}
+
+// ─── Medianoche Madrid ────────────────────────────────────────────────────────
+
+/**
+ * Programa un setTimeout a la próxima medianoche Madrid. Al disparar:
+ * 1) Refetch del cache (queda vacío al inicio del nuevo día).
+ * 2) Reposiciona el siguiente timer.
+ * 3) Notifica al renderer con un ORDERS_INIT vacío.
+ */
+function scheduleMidnightRollover(win: BrowserWindow): void {
+  if (midnightTimer) clearTimeout(midnightTimer);
+  const ms = msUntilNextMidnightMadrid();
+  console.log('[Realtime] Próximo cambio de día en', Math.round(ms / 60000), 'min');
+  midnightTimer = setTimeout(async () => {
+    console.log('[Realtime] Cambio de día — refrescando cache');
+    if (!supabase || !savedWin || savedWin.isDestroyed()) return;
+    const startToday = startOfTodayMadridIso();
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('payment_status', 'paid')
+        .gte('created_at', startToday)
+        .order('created_at', { ascending: true })
+        .limit(200);
+      if (!error) {
+        orders.clear();
+        (data as Order[] ?? []).forEach(o => orders.set(o.id, o));
+        win.webContents.send(IPC.ORDERS_INIT, [...orders.values()]);
+      }
+    } catch (e) {
+      console.error('[Realtime] Error en cambio de día:', e);
+    }
+    scheduleMidnightRollover(win);
+  }, ms);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
