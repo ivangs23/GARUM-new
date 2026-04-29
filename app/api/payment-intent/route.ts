@@ -117,12 +117,21 @@ export async function POST(req: Request) {
       });
     }
 
-    // --- Limpia órdenes pending stale (> 30 min) ---
+    // --- Limpia órdenes pending stale (> 15 min) SOLO de esta mesa ---
+    // Ver comentario en /api/checkout: limitar a la mesa evita pisar
+    // un pedido legítimo de otro cliente cuando su PaymentIntent sigue
+    // vivo en Stripe. El webhook reactiva si llega un pago a un pedido
+    // erróneamente cancelado.
     await supabaseAdmin
       .from("orders")
       .update({ payment_status: "cancelled" })
       .eq("payment_status", "pending")
-      .lt("created_at", new Date(Date.now() - 30 * 60 * 1000).toISOString());
+      .eq("table_number", mesaNum)
+      .lt("created_at", new Date(Date.now() - 15 * 60 * 1000).toISOString());
+
+    // Sub-estados por destino para el trigger BEFORE INSERT
+    const hasKitchen = validatedItems.some((it) => !it.destination || it.destination === "cocina");
+    const hasBar = validatedItems.some((it) => it.destination === "barra");
 
     // --- Crea la orden en pending ---
     const { data: order, error: orderError } = await supabaseAdmin
@@ -133,6 +142,8 @@ export async function POST(req: Request) {
           total_amount: totalCents / 100,
           payment_status: "pending",
           items: validatedItems,
+          staff_status_kitchen: hasKitchen ? "pending" : "na",
+          staff_status_bar: hasBar ? "pending" : "na",
         },
       ])
       .select()

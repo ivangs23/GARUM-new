@@ -10,6 +10,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky",
+    "test:unit": "node --experimental-strip-types --test tests/unit/**/*.test.ts",
+    "test:integration": "node --experimental-strip-types --env-file=.env.local --test tests/integration/**/*.test.ts",
     "test:e2e": "playwright test",
     "test:e2e:public": "playwright test --project=public --project=public-mobile",
     "test:e2e:admin": "playwright test --project=admin",

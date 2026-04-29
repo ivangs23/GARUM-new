@@ -210,7 +210,10 @@ export interface Database {
           total_amount: number | null;
           payment_status: "pending" | "paid" | "cancelled";
           staff_status: "pending" | "done";
+          staff_status_kitchen: "pending" | "done" | "na";
+          staff_status_bar: "pending" | "done" | "na";
           stripe_session_id: string | null;
+          printed_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -220,7 +223,10 @@ export interface Database {
           total_amount?: number | null;
           payment_status?: "pending" | "paid" | "cancelled";
           staff_status?: "pending" | "done";
+          staff_status_kitchen?: "pending" | "done" | "na";
+          staff_status_bar?: "pending" | "done" | "na";
           stripe_session_id?: string | null;
+          printed_at?: string | null;
           created_at?: string;
         };
         Update: {
@@ -230,7 +236,10 @@ export interface Database {
           total_amount?: number | null;
           payment_status?: "pending" | "paid" | "cancelled";
           staff_status?: "pending" | "done";
+          staff_status_kitchen?: "pending" | "done" | "na";
+          staff_status_bar?: "pending" | "done" | "na";
           stripe_session_id?: string | null;
+          printed_at?: string | null;
           created_at?: string;
         };
         Relationships: [];

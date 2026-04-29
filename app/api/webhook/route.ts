@@ -2,60 +2,96 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { headers } from "next/headers";
-import type { Json } from "@/lib/database.types";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-03-25.dahlia",
 });
 
+/**
+ * Marca un pedido como pagado de forma idempotente.
+ *
+ * Caso normal: la fila estaba en `pending`. Hacemos un UPDATE atómico que
+ * solo dispara si sigue así, lo que protege ante reintentos del webhook.
+ *
+ * Caso degradado: la fila quedó en `cancelled` porque el cleanup de
+ * `/api/checkout` o `/api/payment-intent` llegó antes de que Stripe
+ * cobrara. Si Stripe nos confirma el pago, lo reactivamos con un log
+ * explícito (lo deseable es que esto pase muy pocas veces; si pasa a
+ * menudo hay que bajar más el timeout de cleanup).
+ *
+ * Nota: NO reescribimos `stripe_session_id` aquí. Se asignó al crear
+ * el PaymentIntent / Checkout Session y debe quedar inmutable para
+ * que la columna UNIQUE no genere conflictos cruzados.
+ */
 type PaidOrder = {
   id: string;
   table_number: number | null;
   total_amount: number | null;
-  items: Json;
 };
 
 async function markPaid(orderId: string, stripeRef: string) {
-  // Actualización atómica: sólo actualiza si sigue pending.
-  // Si otro webhook ya lo marcó como paid (reintento), no actualiza nada.
-  const { data: updated, error } = await supabaseAdmin
+  // 1) intento normal: pending → paid
+  const { data: paidRows, error: paidErr } = await supabaseAdmin
     .from("orders")
-    .update({ payment_status: "paid", stripe_session_id: stripeRef })
+    .update({ payment_status: "paid" })
     .eq("id", orderId)
     .eq("payment_status", "pending")
-    .select("id, table_number, total_amount, items");
+    .select("id, table_number, total_amount");
 
-  if (error) {
-    console.error("Error actualizando pedido:", error);
+  if (paidErr) {
+    console.error("Error actualizando pedido (pending→paid):", paidErr);
     return { ok: false as const };
   }
-  if (!updated || updated.length === 0) {
-    console.log(`Webhook: pedido ${orderId} ya procesado (o no existe), ignorando.`);
+  if (paidRows && paidRows.length > 0) {
+    return {
+      ok: true as const,
+      order: paidRows[0] as PaidOrder,
+      reactivated: false,
+    };
+  }
+
+  // 2) ¿estaba como cancelled por el cleanup de stale orders?
+  const { data: existing } = await supabaseAdmin
+    .from("orders")
+    .select("id, payment_status, table_number, total_amount")
+    .eq("id", orderId)
+    .maybeSingle();
+
+  if (!existing) {
+    console.warn(`Webhook: pedido ${orderId} no existe (Stripe ref=${stripeRef}).`);
     return { ok: true as const, order: null };
   }
-  return { ok: true as const, order: updated[0] as PaidOrder };
-}
 
-async function insertPrintQueue(order: PaidOrder) {
-  const orderNumber = `P-${Date.now().toString(36).toUpperCase().slice(-6)}`;
-  const orderType = order.table_number ? "mesa" : "llevar";
-
-  const { error } = await supabaseAdmin.from("pedidos").insert([
-    {
-      order_number: orderNumber,
-      order_type: orderType,
-      table_number: order.table_number ? String(order.table_number) : null,
-      total_amount: order.total_amount,
-      status: "paid",
-      items: order.items,
-    },
-  ]);
-
-  if (error) {
-    console.error("Error insertando en pedidos:", error);
-  } else {
-    console.log(`✅ Pedido ${orderNumber} insertado en tabla pedidos.`);
+  if (existing.payment_status === "paid") {
+    // Ya estaba pagado (reintento de Stripe). Idempotente, no hacemos nada.
+    console.log(`Webhook: pedido ${orderId} ya estaba paid, idempotente.`);
+    return { ok: true as const, order: null };
   }
+
+  if (existing.payment_status === "cancelled") {
+    console.warn(
+      `⚠ Webhook: reactivando pedido ${orderId} cancelado (cleanup llegó antes que Stripe). ref=${stripeRef}`
+    );
+    const { data: reactivated, error: reErr } = await supabaseAdmin
+      .from("orders")
+      .update({ payment_status: "paid" })
+      .eq("id", orderId)
+      .eq("payment_status", "cancelled")
+      .select("id, table_number, total_amount");
+    if (reErr) {
+      console.error("Error reactivando pedido cancelled→paid:", reErr);
+      return { ok: false as const };
+    }
+    if (reactivated && reactivated.length > 0) {
+      return {
+        ok: true as const,
+        order: reactivated[0] as PaidOrder,
+        reactivated: true,
+      };
+    }
+  }
+
+  return { ok: true as const, order: null };
 }
 
 export async function POST(req: Request) {
@@ -88,8 +124,9 @@ export async function POST(req: Request) {
     const result = await markPaid(orderId, intent.id);
     if (!result.ok) return NextResponse.json({ error: "DB Update Failed" }, { status: 500 });
     if (result.order) {
-      console.log(`✅ Pedido ${orderId} marcado como pagado (PaymentIntent).`);
-      await insertPrintQueue(result.order);
+      console.log(
+        `✅ Pedido ${orderId} ${result.reactivated ? "REACTIVADO" : "marcado"} como pagado (PaymentIntent).`
+      );
     }
     return NextResponse.json({ received: true });
   }
@@ -108,8 +145,9 @@ export async function POST(req: Request) {
     const result = await markPaid(orderId, sessionId);
     if (!result.ok) return NextResponse.json({ error: "DB Update Failed" }, { status: 500 });
     if (result.order) {
-      console.log(`✅ Pedido ${orderId} marcado como pagado (Checkout Session).`);
-      await insertPrintQueue(result.order);
+      console.log(
+        `✅ Pedido ${orderId} ${result.reactivated ? "REACTIVADO" : "marcado"} como pagado (Checkout Session).`
+      );
     }
     return NextResponse.json({ received: true });
   }
