@@ -2,16 +2,30 @@ import { useState, useEffect } from 'react';
 import Orders  from './pages/Orders';
 import Settings from './pages/Settings';
 import History from './pages/History';
+import type { MaintenanceState } from '../../shared/types';
 
 type Page = 'orders' | 'history' | 'settings';
 
 export default function App() {
   const [page, setPage] = useState<Page>('orders');
   const [status, setStatus] = useState<string>('connecting');
+  const [maintenance, setMaintenance] = useState<MaintenanceState>({
+    enabled: false,
+    message: '',
+  });
 
   useEffect(() => {
-    window.api.onConnectionStatus(s => setStatus(s));
-    return () => window.api.off('connection:status');
+    // Pull: traer el estado actual al montar (cubre el caso de force-reload,
+    // donde el push pasado se perdió porque el renderer aún no estaba listo).
+    window.api.getConnectionStatus().then(setStatus);
+    window.api.getMaintenance().then(setMaintenance);
+    // Push: recibir cambios futuros.
+    window.api.onConnectionStatus(setStatus);
+    window.api.onMaintenanceChanged(setMaintenance);
+    return () => {
+      window.api.off('connection:status');
+      window.api.off('maintenance:changed');
+    };
   }, []);
 
   const statusColor: Record<string, string> = {
@@ -83,6 +97,24 @@ export default function App() {
 
       {/* Contenido */}
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {maintenance.enabled && (
+          <div style={{
+            background: 'rgba(251,146,60,0.1)',
+            borderBottom: '1px solid rgba(251,146,60,0.4)',
+            color: '#fb923c',
+            padding: '0.55rem 1rem',
+            fontSize: '0.8rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+          }}>
+            <span style={{ fontSize: '1rem' }}>⚠️</span>
+            <span>
+              <strong>Modo mantenimiento activo en la web.</strong>{' '}
+              {maintenance.message || 'Los nuevos pedidos están deshabilitados. Solo se ven los ya pagados.'}
+            </span>
+          </div>
+        )}
         {page === 'orders'   && <Orders />}
         {page === 'history'  && <History />}
         {page === 'settings' && <Settings onSaved={() => setPage('orders')} />}

@@ -5,8 +5,15 @@ export type OrderItem = {
   name: string;
   price: number;
   quantity: number;
-  destination?: 'cocina' | 'barra';
+  destination?: 'cocina' | 'barra' | null;
 };
+
+/**
+ * Estado por destino. 'na' = el pedido no tiene items para ese destino
+ * (ver migration 007 en Garum/supabase). El estado global `staff_status`
+ * se deriva en la BD vía trigger; aquí lo conservamos por compatibilidad.
+ */
+export type StaffSubStatus = 'pending' | 'done' | 'na';
 
 export type Order = {
   id: string;
@@ -15,6 +22,9 @@ export type Order = {
   total_amount: number;
   payment_status: 'pending' | 'paid' | 'cancelled';
   staff_status: 'pending' | 'done';
+  staff_status_kitchen: StaffSubStatus;
+  staff_status_bar:     StaffSubStatus;
+  printed_at: string | null;
   created_at: string;
 };
 
@@ -36,7 +46,17 @@ export type PrinterConfig = {
 };
 
 export type AppConfig = {
+  /**
+   * URL del proyecto Supabase. Si está vacío, la app no se conecta y
+   * pide credenciales en la pantalla de Configuración.
+   */
   supabaseUrl: string;
+  /**
+   * Anon key de Supabase. Antes estaba hardcoded en el repositorio:
+   * ahora se lee de variables de entorno (`VITE_SUPABASE_URL` /
+   * `VITE_SUPABASE_ANON_KEY`) o, si están vacías, del archivo
+   * `config.json` que el usuario rellena en Configuración.
+   */
   supabaseKey: string;
   printers: PrinterConfig[];
   autoLaunch: boolean;
@@ -53,6 +73,12 @@ export type DiscoveredPrinter = {
   port?: number;
 };
 
+/** Estado del modo mantenimiento publicado por la web (tabla `settings`). */
+export type MaintenanceState = {
+  enabled: boolean;
+  message: string;
+};
+
 // IPC channels — fuente única de verdad para evitar typos
 export const IPC = {
   ORDERS_GET:              'orders:get',
@@ -62,9 +88,13 @@ export const IPC = {
   ORDERS_REMOVED:          'orders:removed',
   CONFIG_GET:              'config:get',
   CONFIG_SAVE:             'config:save',
+  CONFIG_RECONNECT:        'config:reconnect',
   CONNECTION_STATUS:       'connection:status',
   PRINTERS_LIST_WINDOWS:   'printers:list-windows',
   PRINTERS_SCAN_NETWORK:   'printers:scan-network',
   PRINTERS_TEST:           'printers:test',
   HISTORY_LIST:            'history:list',
+  CONNECTION_GET:          'connection:get',
+  MAINTENANCE_GET:         'maintenance:get',
+  MAINTENANCE_CHANGED:     'maintenance:changed',
 } as const;

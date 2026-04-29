@@ -1,9 +1,29 @@
 import { ThermalPrinter, PrinterTypes, CharacterSet } from 'node-thermal-printer';
-import type { Order, PrinterConfig } from '../../shared/types';
+import type { Order, OrderItem, PrinterConfig } from '../../shared/types';
+import { filterItems, type Destination } from '../../shared/order-routing';
+
+/**
+ * Sanea texto para PC858_EURO. node-thermal-printer hace lo suyo, pero
+ * caracteres como las comillas curvas (« » " "), el carácter de
+ * elipsis (…) o los emojis salen como cajas. Pasamos NFKD y nos
+ * quedamos con el rango ASCII + Latin-1 + euro.
+ */
+function sanitizeForThermal(text: string): string {
+  return text
+    .normalize('NFKD')
+    .replace(/[“”„]/g, '"')
+    .replace(/[‘’‚]/g, "'")
+    .replace(/…/g, '...')
+    .replace(/[–—]/g, '-')
+    .replace(/€/g, '€') // euro: lo dejamos
+    // eliminar emojis y otros símbolos fuera de Latin-1 + euro
+    .replace(/[^\x20-\xff]/g, '?');
+}
 
 /**
  * Imprime el ticket de un pedido en la impresora indicada.
- * Filtra los ítems según el destino configurado en la impresora.
+ * Filtra los ítems según el destino configurado en la impresora,
+ * usando el helper compartido (mismo criterio que el panel staff web).
  */
 export async function printOrderTicket(
   order: Order,
@@ -11,11 +31,16 @@ export async function printOrderTicket(
 ): Promise<void> {
   const dest = printerConfig.destination;
 
-  // Filtrar ítems por destino
-  const items =
-    dest === 'all'
-      ? order.items
-      : order.items.filter(i => !i.destination || i.destination === dest);
+  // Filtrar ítems por destino. 'all' imprime todo. Para 'cocina' / 'barra'
+  // delegamos al helper compartido para que el ruteo sea idéntico al de
+  // la web (incluye fallback por keywords para items legacy sin
+  // `destination`).
+  let items: OrderItem[];
+  if (dest === 'all') {
+    items = order.items;
+  } else {
+    items = filterItems(order.items, dest as Destination);
+  }
 
   if (items.length === 0) return; // nada que imprimir para este destino
 
@@ -68,7 +93,7 @@ export async function printOrderTicket(
   for (const item of items) {
     printer.alignLeft();
     printer.setTextSize(1, 1);
-    printer.println(`${item.quantity}x  ${item.name}`);
+    printer.println(`${item.quantity}x  ${sanitizeForThermal(item.name)}`);
     printer.setTextNormal();
   }
 

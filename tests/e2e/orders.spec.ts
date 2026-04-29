@@ -12,6 +12,9 @@ const sampleOrder: Order = {
   total_amount: 24.5,
   payment_status: 'paid',
   staff_status: 'pending',
+  staff_status_kitchen: 'pending',
+  staff_status_bar:     'pending',
+  printed_at: null,
   created_at: new Date().toISOString(),
   items: [
     { id: 'i1', name: 'Croquetas',  price: 8.0, quantity: 2, destination: 'cocina' },
@@ -55,23 +58,28 @@ test('un nuevo pedido por evento orders:new se añade a la lista', async () => {
   await expect(window.getByText('Copa Vino')).toBeVisible();
 });
 
-test('marcar como LISTO deja la card visible y atenuada', async () => {
+test('marcar como LISTO en cocina solo cierra la card de cocina (per-destino)', async () => {
   const { app: electronApp, window } = app;
   await waitOrdersReady(window);
 
-  // Stub del handler real (no hay Supabase activo, devolvemos void)
+  // Stub: el renderer hace optimistic update; el handler real iría a Supabase.
   await mockIpcHandle(electronApp, 'orders:mark-done', undefined);
 
   await pushFromMain(electronApp, 'orders:init', [sampleOrder]);
   await expect(window.getByText('Croquetas')).toBeVisible();
 
   const cocinaColumn = window.locator('section', { hasText: 'COCINA' });
+  const barraColumn  = window.locator('section', { hasText: 'BARRA' });
+
   await cocinaColumn.getByRole('button', { name: /LISTO/ }).click();
 
-  // La card sigue visible pero marcada como done (atenuada)
+  // La card de cocina queda atenuada y sin botón
   await expect(cocinaColumn.locator('[data-done="true"]')).toBeVisible();
-  // El botón LISTO de esa card ya no debe existir en la columna cocina
   await expect(cocinaColumn.getByRole('button', { name: /LISTO/ })).toHaveCount(0);
+
+  // La card de barra sigue activa: sin data-done y mantiene su botón LISTO
+  await expect(barraColumn.locator('[data-done="true"]')).toHaveCount(0);
+  await expect(barraColumn.getByRole('button', { name: /LISTO/ })).toHaveCount(1);
 });
 
 test('un pedido eliminado por orders:removed desaparece de la vista', async () => {

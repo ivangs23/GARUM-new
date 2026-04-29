@@ -1,6 +1,13 @@
-import { BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, shell } from 'electron';
 import { join } from 'path';
 import { is } from '@electron-toolkit/utils';
+
+// Cuando el usuario cierra la ventana queremos esconder a bandeja, pero cuando
+// el SO/electron-vite manda SIGTERM tenemos que dejar que el quit complete:
+// si `e.preventDefault()` corre durante un quit, Electron lo cancela también
+// y el proceso queda zombie reteniendo el SingletonLock.
+let isQuitting = false;
+app.on('before-quit', () => { isQuitting = true; });
 
 export function createMainWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -22,8 +29,9 @@ export function createMainWindow(): BrowserWindow {
   // Mostrar cuando esté lista (evita flash blanco)
   win.on('ready-to-show', () => win.show());
 
-  // Cerrar = minimizar a bandeja (no salir)
+  // Cerrar = minimizar a bandeja (no salir), salvo que estemos saliendo de verdad.
   win.on('close', e => {
+    if (isQuitting) return;
     e.preventDefault();
     win.hide();
   });

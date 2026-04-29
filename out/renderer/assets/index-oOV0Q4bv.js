@@ -12465,72 +12465,85 @@ function useElapsed(created_at) {
   return elapsed;
 }
 function OrderCard({ order, dest, onDone }) {
+  const isDone = order.staff_status === "done";
   const elapsed = useElapsed(order.created_at);
   const items = filterItems(order.items, dest);
   const secs = Math.floor((Date.now() - new Date(order.created_at).getTime()) / 1e3);
-  const isUrgent = secs > 600;
-  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: {
-    background: isUrgent ? "#1a0f0f" : "var(--surface)",
-    border: `1px solid ${isUrgent ? "rgba(239,68,68,.5)" : "var(--border)"}`,
-    borderRadius: 14,
-    padding: "1rem",
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.75rem",
-    animation: "slideIn 0.25s ease"
-  }, children: [
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" }, children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { style: {
-        background: "var(--primary)",
-        color: "#fff",
-        padding: "0.25rem 0.75rem",
-        borderRadius: 6,
-        fontWeight: 900,
-        fontSize: "1.1rem"
-      }, children: [
-        "MESA ",
-        order.table_number
-      ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { style: { fontSize: "0.78rem", color: isUrgent ? "var(--red)" : "var(--muted)", fontFamily: "monospace", fontWeight: isUrgent ? 700 : 400 }, children: [
-        "⏱ ",
-        elapsed
-      ] })
-    ] }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("ul", { style: { listStyle: "none", borderTop: "1px solid var(--border)", paddingTop: "0.6rem", display: "flex", flexDirection: "column", gap: "0.3rem" }, children: items.map((item, i) => /* @__PURE__ */ jsxRuntimeExports.jsxs("li", { style: { fontFamily: "monospace", fontSize: "0.9rem", display: "flex", gap: "0.5rem" }, children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { style: { color: "var(--primary)", fontWeight: 700, minWidth: 24 }, children: [
-        item.quantity,
-        "×"
-      ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: item.name })
-    ] }, i)) }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx(
-      "button",
-      {
-        onClick: () => onDone(order.id),
-        style: {
-          background: "rgba(74,222,128,.1)",
-          border: "1px solid rgba(74,222,128,.3)",
-          borderRadius: 8,
-          color: "var(--green)",
-          padding: "0.5rem",
-          fontWeight: 600,
-          fontSize: "0.8rem",
-          letterSpacing: "0.05em",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: "0.4rem",
-          transition: "all 0.15s"
-        },
-        onMouseEnter: (e) => e.currentTarget.style.background = "rgba(74,222,128,.2)",
-        onMouseLeave: (e) => e.currentTarget.style.background = "rgba(74,222,128,.1)",
-        children: "✓ LISTO"
-      }
-    )
-  ] });
+  const isUrgent = !isDone && secs > 600;
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs(
+    "div",
+    {
+      "data-done": isDone ? "true" : "false",
+      style: {
+        background: isDone ? "#0e0e0e" : isUrgent ? "#1a0f0f" : "var(--surface)",
+        border: `1px solid ${isDone ? "var(--border)" : isUrgent ? "rgba(239,68,68,.5)" : "var(--border)"}`,
+        borderRadius: 14,
+        padding: "1rem",
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.75rem",
+        animation: "slideIn 0.25s ease",
+        opacity: isDone ? 0.5 : 1
+      },
+      children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" }, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { style: {
+            background: isDone ? "var(--muted)" : "var(--primary)",
+            color: "#fff",
+            padding: "0.25rem 0.75rem",
+            borderRadius: 6,
+            fontWeight: 900,
+            fontSize: "1.1rem"
+          }, children: [
+            "MESA ",
+            order.table_number
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: {
+            fontSize: "0.78rem",
+            color: isDone ? "var(--muted)" : isUrgent ? "var(--red)" : "var(--muted)",
+            fontFamily: "monospace",
+            fontWeight: isUrgent ? 700 : 400
+          }, children: isDone ? `✓ ${new Date(order.created_at).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}` : `⏱ ${elapsed}` })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("ul", { style: { listStyle: "none", borderTop: "1px solid var(--border)", paddingTop: "0.6rem", display: "flex", flexDirection: "column", gap: "0.3rem" }, children: items.map((item, i) => /* @__PURE__ */ jsxRuntimeExports.jsxs("li", { style: { fontFamily: "monospace", fontSize: "0.9rem", display: "flex", gap: "0.5rem" }, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { style: { color: isDone ? "var(--muted)" : "var(--primary)", fontWeight: 700, minWidth: 24 }, children: [
+            item.quantity,
+            "×"
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: item.name })
+        ] }, i)) }),
+        !isDone && /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "button",
+          {
+            onClick: () => onDone(order.id),
+            style: {
+              background: "rgba(74,222,128,.1)",
+              border: "1px solid rgba(74,222,128,.3)",
+              borderRadius: 8,
+              color: "var(--green)",
+              padding: "0.5rem",
+              fontWeight: 600,
+              fontSize: "0.8rem",
+              letterSpacing: "0.05em",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "0.4rem",
+              transition: "all 0.15s"
+            },
+            onMouseEnter: (e) => e.currentTarget.style.background = "rgba(74,222,128,.2)",
+            onMouseLeave: (e) => e.currentTarget.style.background = "rgba(74,222,128,.1)",
+            children: "✓ LISTO"
+          }
+        )
+      ]
+    }
+  );
 }
 function Column({ dest, orders, onDone }) {
   const active = orders.filter((o) => filterItems(o.items, dest).length > 0);
+  const pending = active.filter((o) => o.staff_status !== "done");
+  const done = active.filter((o) => o.staff_status === "done");
   const colors = {
     cocina: { bg: "rgba(251,146,60,.08)", border: "rgba(251,146,60,.25)", text: "#fb923c" },
     barra: { bg: "rgba(212,175,55,.08)", border: "rgba(212,175,55,.25)", text: "#d4af37" }
@@ -12559,8 +12572,9 @@ function Column({ dest, orders, onDone }) {
       }, children: active.length })
     ] }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "0.6rem", overflowY: "auto" }, children: [
-      active.map((o) => /* @__PURE__ */ jsxRuntimeExports.jsx(OrderCard, { order: o, dest, onDone }, o.id + dest)),
-      active.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: {
+      pending.map((o) => /* @__PURE__ */ jsxRuntimeExports.jsx(OrderCard, { order: o, dest, onDone }, o.id + dest)),
+      done.map((o) => /* @__PURE__ */ jsxRuntimeExports.jsx(OrderCard, { order: o, dest, onDone }, o.id + dest)),
+      pending.length === 0 && done.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: {
         textAlign: "center",
         padding: "2.5rem 1rem",
         color: "var(--muted)",
@@ -12583,7 +12597,11 @@ function Orders() {
     setOrders((prev) => prev.filter((o) => o.id !== id));
   }, []);
   reactExports.useEffect(() => {
-    window.api.getOrders().then(setOrders);
+    console.log("[Diag-Renderer]", (/* @__PURE__ */ new Date()).toISOString(), "Orders mount, calling getOrders");
+    window.api.getOrders().then((o) => {
+      console.log("[Diag-Renderer]", (/* @__PURE__ */ new Date()).toISOString(), "getOrders devolvió", o.length, "pedidos");
+      setOrders(o);
+    });
     window.api.onOrdersInit(setOrders);
     window.api.onNewOrder(upsert);
     window.api.onOrderRemoved(remove);
@@ -12594,7 +12612,7 @@ function Orders() {
     };
   }, [upsert, remove]);
   const markDone = async (id) => {
-    remove(id);
+    setOrders((prev) => prev.map((o) => o.id === id ? { ...o, staff_status: "done" } : o));
     await window.api.markDone(id);
   };
   const total = orders.length;
@@ -12942,11 +12960,123 @@ const sectionTitle = {
   paddingBottom: "0.5rem",
   borderBottom: "1px solid var(--border)"
 };
+const PAGE_SIZE = 50;
+const madridDayFmt = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Europe/Madrid",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit"
+});
+function dayKey(iso) {
+  return madridDayFmt.format(new Date(iso));
+}
+function dayLabel(iso) {
+  const k = dayKey(iso);
+  const todayKey = dayKey((/* @__PURE__ */ new Date()).toISOString());
+  const yesterdayKey = dayKey(new Date(Date.now() - 24 * 3600 * 1e3).toISOString());
+  if (k === todayKey) return "Hoy";
+  if (k === yesterdayKey) return "Ayer";
+  return new Date(iso).toLocaleDateString("es-ES", {
+    weekday: "long",
+    day: "numeric",
+    month: "short",
+    timeZone: "Europe/Madrid"
+  });
+}
+function HistoryCard({ order }) {
+  const time = new Date(order.created_at).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+  const isCancelled = order.payment_status === "cancelled";
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: {
+    background: "var(--surface)",
+    border: "1px solid var(--border)",
+    borderRadius: 10,
+    padding: "0.85rem 1rem",
+    display: "flex",
+    flexDirection: "column",
+    gap: "0.5rem",
+    opacity: isCancelled ? 0.6 : 1
+  }, children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" }, children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { style: { fontWeight: 700 }, children: [
+        "Mesa ",
+        order.table_number
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { fontFamily: "monospace", fontSize: "0.85rem", color: "var(--muted)" }, children: time })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("ul", { style: { listStyle: "none", display: "flex", flexDirection: "column", gap: "0.2rem" }, children: order.items.map((it, i) => /* @__PURE__ */ jsxRuntimeExports.jsxs("li", { style: { fontSize: "0.85rem", fontFamily: "monospace" }, children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { style: { color: "var(--primary)", fontWeight: 700 }, children: [
+        it.quantity,
+        "×"
+      ] }),
+      " ",
+      it.name
+    ] }, i)) }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "var(--muted)" }, children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: isCancelled ? "Cancelado" : `Total ${order.total_amount.toFixed(2)} €` }) })
+  ] });
+}
+function History() {
+  const [orders, setOrders] = reactExports.useState([]);
+  const [offset, setOffset] = reactExports.useState(0);
+  const [loading, setLoading] = reactExports.useState(true);
+  const [hasMore, setHasMore] = reactExports.useState(true);
+  const sentinelRef = reactExports.useRef(null);
+  const inFlight = reactExports.useRef(false);
+  const loadPage = reactExports.useCallback(async (currentOffset) => {
+    if (inFlight.current || !hasMore) return;
+    inFlight.current = true;
+    setLoading(true);
+    try {
+      const page = await window.api.listHistory(PAGE_SIZE, currentOffset);
+      setOrders((prev) => [...prev, ...page]);
+      setOffset(currentOffset + page.length);
+      if (page.length < PAGE_SIZE) setHasMore(false);
+    } finally {
+      inFlight.current = false;
+      setLoading(false);
+    }
+  }, [hasMore]);
+  reactExports.useEffect(() => {
+    loadPage(0);
+  }, []);
+  reactExports.useEffect(() => {
+    if (!sentinelRef.current) return;
+    const obs = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) loadPage(offset);
+    }, { rootMargin: "200px" });
+    obs.observe(sentinelRef.current);
+    return () => obs.disconnect();
+  }, [offset, loadPage]);
+  const grouped = orders.reduce((acc, o) => {
+    const k = dayKey(o.created_at);
+    (acc[k] = acc[k] ?? []).push(o);
+    return acc;
+  }, {});
+  const dayKeys = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { padding: "1.25rem 1.5rem", overflowY: "auto", flex: 1 }, children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { style: { fontSize: "1.1rem", fontWeight: 700, marginBottom: "1rem" }, children: "Historial" }),
+    orders.length === 0 && !loading && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { color: "var(--muted)", fontSize: "0.9rem", textAlign: "center", padding: "2rem" }, children: "Sin pedidos antiguos" }),
+    dayKeys.map((k) => /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { style: { marginBottom: "1.5rem" }, children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { style: {
+        fontSize: "0.8rem",
+        textTransform: "uppercase",
+        letterSpacing: "0.1em",
+        color: "var(--muted)",
+        marginBottom: "0.6rem",
+        borderBottom: "1px solid var(--border)",
+        paddingBottom: "0.3rem"
+      }, children: dayLabel(grouped[k][0].created_at) }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { display: "flex", flexDirection: "column", gap: "0.5rem" }, children: grouped[k].map((o) => /* @__PURE__ */ jsxRuntimeExports.jsx(HistoryCard, { order: o }, o.id)) })
+    ] }, k)),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { ref: sentinelRef, style: { height: 1 } }),
+    loading && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { color: "var(--muted)", textAlign: "center", fontSize: "0.85rem" }, children: "Cargando..." })
+  ] });
+}
 function App() {
   const [page, setPage] = reactExports.useState("orders");
   const [status, setStatus] = reactExports.useState("connecting");
   reactExports.useEffect(() => {
-    window.api.onConnectionStatus((s) => setStatus(s));
+    window.api.getConnectionStatus().then(setStatus);
+    window.api.onConnectionStatus(setStatus);
     return () => window.api.off("connection:status");
   }, []);
   const statusColor = {
@@ -12972,7 +13102,11 @@ function App() {
         /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { fontSize: "1.1rem", fontWeight: 800, letterSpacing: "0.1em" }, children: "GARUM" }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { fontSize: "0.7rem", color: "var(--muted)", marginTop: 2 }, children: "Panel de Comandas" })
       ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("nav", { style: { flex: 1, padding: "1rem 0" }, children: [["orders", "🍽 Comandas"], ["settings", "⚙️ Configuración"]].map(([p, label]) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+      /* @__PURE__ */ jsxRuntimeExports.jsx("nav", { style: { flex: 1, padding: "1rem 0" }, children: [
+        ["orders", "🍽 Comandas"],
+        ["history", "📜 Historial"],
+        ["settings", "⚙️ Configuración"]
+      ].map(([p, label]) => /* @__PURE__ */ jsxRuntimeExports.jsx(
         "button",
         {
           onClick: () => setPage(p),
@@ -13011,7 +13145,11 @@ function App() {
         /* @__PURE__ */ jsxRuntimeExports.jsx("span", { style: { fontSize: "0.75rem", color: "var(--muted)" }, children: statusLabel[status] ?? status })
       ] })
     ] }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("main", { style: { flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }, children: page === "orders" ? /* @__PURE__ */ jsxRuntimeExports.jsx(Orders, {}) : /* @__PURE__ */ jsxRuntimeExports.jsx(Settings, { onSaved: () => setPage("orders") }) })
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("main", { style: { flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }, children: [
+      page === "orders" && /* @__PURE__ */ jsxRuntimeExports.jsx(Orders, {}),
+      page === "history" && /* @__PURE__ */ jsxRuntimeExports.jsx(History, {}),
+      page === "settings" && /* @__PURE__ */ jsxRuntimeExports.jsx(Settings, { onSaved: () => setPage("orders") })
+    ] })
   ] });
 }
 ReactDOM.createRoot(document.getElementById("root")).render(

@@ -12,6 +12,9 @@ const historyOrder: Order = {
   total_amount: 18.5,
   payment_status: 'paid',
   staff_status: 'done',
+  staff_status_kitchen: 'done',
+  staff_status_bar: 'na',
+  printed_at: '2026-04-27T20:00:00.000Z',
   created_at: '2026-04-27T20:00:00.000Z',
   items: [{ id: 'i1', name: 'Croquetas', price: 8.0, quantity: 2, destination: 'cocina' }],
 };
@@ -36,12 +39,16 @@ test('la página Historial muestra pedidos agrupados por fecha', async () => {
   const yesterday: Order = {
     id: 'h-yest', table_number: 4, total_amount: 12, payment_status: 'paid',
     staff_status: 'done',
+    staff_status_kitchen: 'done', staff_status_bar: 'na',
+    printed_at: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
     created_at: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
     items: [{ id: 'i1', name: 'Patatas', price: 6, quantity: 2, destination: 'cocina' }],
   };
   const twoDaysAgo: Order = {
     id: 'h-2d', table_number: 7, total_amount: 8, payment_status: 'paid',
     staff_status: 'done',
+    staff_status_kitchen: 'done', staff_status_bar: 'na',
+    printed_at: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString(),
     created_at: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString(),
     items: [{ id: 'i1', name: 'Pulpo', price: 8, quantity: 1, destination: 'cocina' }],
   };

@@ -8,12 +8,18 @@ test.afterEach (async () => { await app.close(); });
 
 const pendingOrder: Order = {
   id: 'pend-1', table_number: 5, total_amount: 10, payment_status: 'paid',
-  staff_status: 'pending', created_at: new Date().toISOString(),
+  staff_status: 'pending',
+  staff_status_kitchen: 'pending', staff_status_bar: 'na',
+  printed_at: null,
+  created_at: new Date().toISOString(),
   items: [{ id: 'i1', name: 'Calamares', price: 10, quantity: 1, destination: 'cocina' }],
 };
 const doneOrder: Order = {
   id: 'done-1', table_number: 9, total_amount: 5, payment_status: 'paid',
-  staff_status: 'done', created_at: new Date(Date.now() - 60_000).toISOString(),
+  staff_status: 'done',
+  staff_status_kitchen: 'done', staff_status_bar: 'na',
+  printed_at: new Date(Date.now() - 60_000).toISOString(),
+  created_at: new Date(Date.now() - 60_000).toISOString(),
   items: [{ id: 'i1', name: 'Tortilla', price: 5, quantity: 1, destination: 'cocina' }],
 };
 

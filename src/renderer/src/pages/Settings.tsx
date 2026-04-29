@@ -20,16 +20,35 @@ function newPrinter(overrides: Partial<PrinterConfig> = {}): PrinterConfig {
 
 export default function Settings({ onSaved: _onSaved }: { onSaved: () => void }) {
   const [printers, setPrinters] = useState<PrinterConfig[]>([]);
+  const [supabaseUrl, setSupabaseUrl] = useState('');
+  const [supabaseKey, setSupabaseKey] = useState('');
+  const [autoLaunch,  setAutoLaunch]  = useState(true);
+  const [scanSubnet,  setScanSubnet]  = useState('');
   const [saving,   setSaving]   = useState(false);
   const [saved,    setSaved]    = useState(false);
 
-  useEffect(() => { window.api.getConfig().then(cfg => setPrinters(cfg.printers)); }, []);
+  useEffect(() => {
+    window.api.getConfig().then(cfg => {
+      setPrinters(cfg.printers);
+      setSupabaseUrl(cfg.supabaseUrl ?? '');
+      setSupabaseKey(cfg.supabaseKey ?? '');
+      setAutoLaunch(cfg.autoLaunch ?? true);
+      setScanSubnet(cfg.scanSubnet ?? '');
+    });
+  }, []);
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      const cfg = await window.api.getConfig();
-      await window.api.saveConfig({ ...cfg, printers });
+      await window.api.saveConfig({
+        printers,
+        supabaseUrl: supabaseUrl.trim(),
+        supabaseKey: supabaseKey.trim(),
+        autoLaunch,
+        scanSubnet: scanSubnet.trim(),
+      });
+      // Si las credenciales cambiaron, reconectar el listener de Realtime.
+      await window.api.reconnect();
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } finally {
@@ -44,6 +63,14 @@ export default function Settings({ onSaved: _onSaved }: { onSaved: () => void })
   return (
     <div style={{ padding: '2rem', maxWidth: 640, overflowY: 'auto', height: '100%' }}>
       <h1 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '2rem' }}>Configuración</h1>
+
+      {/* ── Conexión Supabase ── */}
+      <ConnectionSection
+        url={supabaseUrl}     onUrlChange={setSupabaseUrl}
+        key_={supabaseKey}    onKeyChange={setSupabaseKey}
+        autoLaunch={autoLaunch} onAutoLaunchChange={setAutoLaunch}
+        scanSubnet={scanSubnet} onScanSubnetChange={setScanSubnet}
+      />
 
       {/* ── Impresoras ── */}
       <PrintersSection
@@ -69,6 +96,84 @@ export default function Settings({ onSaved: _onSaved }: { onSaved: () => void })
         {saving ? 'Guardando...' : saved ? '✓ Guardado' : 'Guardar'}
       </button>
     </div>
+  );
+}
+
+// ── Sección credenciales Supabase ─────────────────────────────────────────────
+
+function ConnectionSection({
+  url, onUrlChange, key_, onKeyChange,
+  autoLaunch, onAutoLaunchChange,
+  scanSubnet, onScanSubnetChange,
+}: {
+  url: string;
+  onUrlChange: (v: string) => void;
+  key_: string;
+  onKeyChange: (v: string) => void;
+  autoLaunch: boolean;
+  onAutoLaunchChange: (v: boolean) => void;
+  scanSubnet: string;
+  onScanSubnetChange: (v: string) => void;
+}) {
+  const [showKey, setShowKey] = useState(false);
+  return (
+    <section style={{ marginBottom: '2rem' }}>
+      <h2 style={sectionTitle}>Conexión Supabase</h2>
+      <p style={{ color: 'var(--muted)', fontSize: '0.78rem', marginTop: '-0.5rem', marginBottom: '0.85rem' }}>
+        El panel se conecta a la base de datos del restaurante para recibir
+        los pedidos pagados. Si no rellenas estos campos, la app arranca sin
+        conexión.
+      </p>
+
+      <Field label="URL del proyecto">
+        <input
+          style={inputStyle}
+          placeholder="https://xxxxx.supabase.co"
+          value={url}
+          onChange={e => onUrlChange(e.target.value)}
+        />
+      </Field>
+
+      <Field label="Anon key">
+        <div style={{ display: 'flex', gap: '0.4rem' }}>
+          <input
+            style={{ ...inputStyle, fontFamily: 'monospace' }}
+            type={showKey ? 'text' : 'password'}
+            placeholder="eyJhbGci..."
+            value={key_}
+            onChange={e => onKeyChange(e.target.value)}
+          />
+          <button
+            type="button"
+            style={{ ...ghostBtn, padding: '0.45rem 0.7rem' }}
+            onClick={() => setShowKey(s => !s)}
+          >
+            {showKey ? 'Ocultar' : 'Mostrar'}
+          </button>
+        </div>
+      </Field>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+        <Field label="Subred a escanear (opcional)">
+          <input
+            style={inputStyle}
+            placeholder="192.168.1"
+            value={scanSubnet}
+            onChange={e => onScanSubnetChange(e.target.value)}
+          />
+        </Field>
+        <Field label="Iniciar con Windows">
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.55rem 0' }}>
+            <input
+              type="checkbox"
+              checked={autoLaunch}
+              onChange={e => onAutoLaunchChange(e.target.checked)}
+            />
+            <span style={{ fontSize: '0.85rem' }}>Auto-arranque al iniciar sesión</span>
+          </label>
+        </Field>
+      </div>
+    </section>
   );
 }
 

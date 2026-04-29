@@ -1,33 +1,26 @@
-import { useState, useEffect, useCallback } from 'react';
-import type { Order, OrderItem } from '../../../shared/types';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import type { Order, OrderItem, StaffSubStatus } from '../../../shared/types';
+import {
+  filterItems,
+  hasItemsFor,
+  type Destination,
+} from '../../../shared/order-routing';
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function filterItems(items: OrderItem[], dest: 'cocina' | 'barra'): OrderItem[] {
-  return items.filter(item => {
-    if (item.destination) return item.destination === dest;
-    // Fallback para pedidos legacy sin campo destination
-    const barraKw = ['vino', 'cerveza', 'café', 'copa', 'cóctel', 'agua', 'refresco'];
-    const isBarra = barraKw.some(kw => item.name.toLowerCase().includes(kw));
-    return dest === 'barra' ? isBarra : !isBarra;
-  });
-}
+// ─── Hooks ────────────────────────────────────────────────────────────────────
 
 function useElapsed(created_at: string): string {
   const [elapsed, setElapsed] = useState('');
-
   useEffect(() => {
     const update = () => {
       const secs = Math.floor((Date.now() - new Date(created_at).getTime()) / 1000);
-      if (secs < 60)   setElapsed(`${secs}s`);
+      if (secs < 60)        setElapsed(`${secs}s`);
       else if (secs < 3600) setElapsed(`${Math.floor(secs / 60)}m ${secs % 60}s`);
-      else setElapsed(`${Math.floor(secs / 3600)}h ${Math.floor((secs % 3600) / 60)}m`);
+      else                  setElapsed(`${Math.floor(secs / 3600)}h ${Math.floor((secs % 3600) / 60)}m`);
     };
     update();
     const id = setInterval(update, 1000);
     return () => clearInterval(id);
   }, [created_at]);
-
   return elapsed;
 }
 
@@ -35,12 +28,14 @@ function useElapsed(created_at: string): string {
 
 function OrderCard({ order, dest, onDone }: {
   order: Order;
-  dest: 'cocina' | 'barra';
-  onDone: (id: string) => void;
+  dest: Destination;
+  onDone: (id: string, dest: Destination) => void;
 }) {
-  const isDone   = order.staff_status === 'done';
+  const subStatus: StaffSubStatus =
+    dest === 'cocina' ? order.staff_status_kitchen : order.staff_status_bar;
+  const isDone   = subStatus === 'done';
   const elapsed  = useElapsed(order.created_at);
-  const items    = filterItems(order.items, dest);
+  const items: OrderItem[] = filterItems(order.items, dest);
   const secs     = Math.floor((Date.now() - new Date(order.created_at).getTime()) / 1000);
   const isUrgent = !isDone && secs > 600;
 
@@ -86,7 +81,7 @@ function OrderCard({ order, dest, onDone }: {
       {/* Acción solo en pendientes */}
       {!isDone && (
         <button
-          onClick={() => onDone(order.id)}
+          onClick={() => onDone(order.id, dest)}
           style={{
             background: 'rgba(74,222,128,.1)', border: '1px solid rgba(74,222,128,.3)',
             borderRadius: 8, color: 'var(--green)', padding: '0.5rem',
@@ -107,13 +102,15 @@ function OrderCard({ order, dest, onDone }: {
 // ─── Columna ──────────────────────────────────────────────────────────────────
 
 function Column({ dest, orders, onDone }: {
-  dest: 'cocina' | 'barra';
+  dest: Destination;
   orders: Order[];
-  onDone: (id: string) => void;
+  onDone: (id: string, dest: Destination) => void;
 }) {
-  const active  = orders.filter(o => filterItems(o.items, dest).length > 0);
-  const pending = active.filter(o => o.staff_status !== 'done');
-  const done    = active.filter(o => o.staff_status === 'done');
+  const active = orders.filter(o => hasItemsFor(o.items, dest));
+  const subStatus = (o: Order): StaffSubStatus =>
+    dest === 'cocina' ? o.staff_status_kitchen : o.staff_status_bar;
+  const pending = active.filter(o => subStatus(o) === 'pending');
+  const done    = active.filter(o => subStatus(o) === 'done');
 
   const colors = {
     cocina: { bg: 'rgba(251,146,60,.08)', border: 'rgba(251,146,60,.25)', text: '#fb923c' },
@@ -138,7 +135,7 @@ function Column({ dest, orders, onDone }: {
           background: 'rgba(255,255,255,.1)', borderRadius: 20,
           padding: '0.1rem 0.5rem', fontSize: '0.8rem', fontWeight: 700,
         }}>
-          {active.length}
+          {pending.length}
         </span>
       </div>
 
@@ -168,6 +165,8 @@ function Column({ dest, orders, onDone }: {
 
 export default function Orders() {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [error, setError]   = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const upsert = useCallback((order: Order) => {
     setOrders(prev => {
@@ -183,30 +182,58 @@ export default function Orders() {
   }, []);
 
   useEffect(() => {
-    // Carga inicial
+    // Audio para nuevos pedidos. Si el archivo no existe, .play() falla
+    // en silencio (catch).
+    audioRef.current = new Audio('./notification.mp3');
+    audioRef.current.preload = 'auto';
+
     window.api.getOrders().then(setOrders);
 
-    // Eventos en tiempo real
     window.api.onOrdersInit(setOrders);
-    window.api.onNewOrder(upsert);
+    window.api.onNewOrder(o => {
+      // Solo sonido cuando el pedido llega "fresco" (no impreso aún
+      // y con algún destino pendiente). Evita sonidos al recargar histórico.
+      const fresh = o.printed_at == null && (
+        o.staff_status_kitchen === 'pending' || o.staff_status_bar === 'pending'
+      );
+      upsert(o);
+      if (fresh) audioRef.current?.play().catch(() => {});
+    });
     window.api.onOrderRemoved(remove);
 
     return () => {
       window.api.off('orders:init');
       window.api.off('orders:new');
       window.api.off('orders:removed');
+      audioRef.current = null;
     };
   }, [upsert, remove]);
 
-  const markDone = async (id: string) => {
-    // No quitamos de la lista local: el pedido sigue visible atenuado.
-    // El main process actualizará staff_status='done' en BD; el evento de
-    // Realtime devolverá un upsert con staff_status='done' que ya gestiona upsert.
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, staff_status: 'done' } : o));
-    await window.api.markDone(id);
+  /**
+   * Marca listo SOLO el destino concreto. Optimistic update con
+   * rollback si la BD rechaza el cambio (sin conexión, RLS, etc.).
+   */
+  const markDone = async (id: string, dest: Destination) => {
+    const column = dest === 'cocina' ? 'staff_status_kitchen' : 'staff_status_bar';
+    const prev = orders;
+
+    setOrders(curr =>
+      curr.map(o => o.id === id ? { ...o, [column]: 'done' as StaffSubStatus } : o),
+    );
+
+    try {
+      await window.api.markDone({ id, destination: dest });
+    } catch (e) {
+      console.error('[Orders] markDone failed:', e);
+      setOrders(prev); // rollback
+      setError('No se pudo marcar como listo. Revisa la conexión.');
+      setTimeout(() => setError(null), 4000);
+    }
   };
 
-  const total = orders.length;
+  const total = orders.filter(o =>
+    o.staff_status_kitchen === 'pending' || o.staff_status_bar === 'pending'
+  ).length;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -220,6 +247,18 @@ export default function Orders() {
           {total === 0 ? 'Todo listo ✓' : `${total} mesa${total > 1 ? 's' : ''} pendiente${total > 1 ? 's' : ''}`}
         </span>
       </div>
+
+      {error && (
+        <div style={{
+          background: 'rgba(239,68,68,.12)',
+          color: '#f87171',
+          borderBottom: '1px solid rgba(239,68,68,.3)',
+          padding: '0.55rem 1.5rem',
+          fontSize: '0.8rem',
+        }}>
+          {error}
+        </div>
+      )}
 
       {/* Columnas */}
       <div style={{

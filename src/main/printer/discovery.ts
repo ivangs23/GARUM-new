@@ -24,11 +24,15 @@ export async function listWindowsPrinters(): Promise<DiscoveredPrinter[]> {
 // ─── Escáner de red (puerto 9100) ─────────────────────────────────────────────
 
 const DEFAULT_SUBNETS = ['192.168.1', '192.168.0', '10.0.0'];
+const MAX_CONCURRENCY = 64; // sockets simultáneos
 
 /**
  * Escanea subredes en busca de impresoras ESC/POS en puerto 9100.
- * Si se pasa customSubnet (ej. "192.168.5"), solo escanea esa subred.
- * De lo contrario usa las subredes por defecto.
+ *
+ * Limita el número de sockets concurrentes para no saturar el firewall
+ * ni congelar la máquina cuando se escanean cientos de hosts. El
+ * comportamiento previo lanzaba ~762 sockets en paralelo y disparaba
+ * advertencias de algunos antivirus.
  */
 export async function scanNetworkPrinters(
   customSubnet?: string,
@@ -36,20 +40,28 @@ export async function scanNetworkPrinters(
 ): Promise<DiscoveredPrinter[]> {
   const baseSubnets = customSubnet ? [customSubnet.trim()] : DEFAULT_SUBNETS;
   const found: DiscoveredPrinter[] = [];
-  const checks: Promise<void>[] = [];
 
+  const targets: string[] = [];
   for (const subnet of baseSubnets) {
-    for (let i = 1; i <= 254; i++) {
-      const host = `${subnet}.${i}`;
-      checks.push(
-        probePort(host, 9100, timeoutMs).then(open => {
-          if (open) found.push({ type: 'tcp', host, port: 9100 });
-        }),
-      );
+    for (let i = 1; i <= 254; i++) targets.push(`${subnet}.${i}`);
+  }
+
+  let cursor = 0;
+  async function worker(): Promise<void> {
+    while (true) {
+      const idx = cursor++;
+      if (idx >= targets.length) return;
+      const host = targets[idx];
+      const open = await probePort(host, 9100, timeoutMs);
+      if (open) found.push({ type: 'tcp', host, port: 9100 });
     }
   }
 
-  await Promise.all(checks);
+  const workers = Array.from(
+    { length: Math.min(MAX_CONCURRENCY, targets.length) },
+    () => worker(),
+  );
+  await Promise.all(workers);
 
   // Ordenar por última parte de la IP
   return found.sort((a, b) => {

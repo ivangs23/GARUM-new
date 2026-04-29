@@ -16,7 +16,7 @@
     "test:e2e:ui": "playwright test --ui"
   },
   "build": {
-    "appId": "es.garum.vinoteca.desktop",
+    "appId": "com.garum.desktop",
     "productName": "Garum Desktop",
     "copyright": "Garum Vinoteca",
     "directories": {
@@ -58,7 +58,8 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.102.1",
-    "node-thermal-printer": "^4.6.0"
+    "node-thermal-printer": "^4.6.0",
+    "ws": "^8.20.0"
   },
   "devDependencies": {
     "@electron-toolkit/preload": "^3.0.0",
@@ -67,6 +68,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^4",
     "electron": "^33",
     "electron-builder": "^25",

@@ -5,6 +5,11 @@ import { setupIpc }           from './ipc';
 import { startRealtimeListener, stopRealtimeListener } from './realtime';
 import { loadConfig }         from './config';
 
+// AppUserModelId — necesario en Windows para que las notificaciones
+// muestren el icono y el nombre correctos en vez del de Electron.
+// Coincide con el `appId` del electron-builder.yml.
+app.setAppUserModelId('com.garum.desktop');
+
 // ── Instancia única ───────────────────────────────────────────────────────────
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -30,8 +35,9 @@ app.whenReady().then(async () => {
     });
   }
 
-  // Conectar Realtime si ya hay credenciales guardadas (omitir en E2E)
-  if (!isE2E && config.supabaseUrl && config.supabaseKey) {
+  // Conectar Realtime (omitir en E2E). Si no hay credenciales, el listener
+  // marca 'disconnected' por sí mismo para que la UI no se quede en "Conectando".
+  if (!isE2E) {
     await startRealtimeListener(config.supabaseUrl, config.supabaseKey, mainWindow);
   }
 });
@@ -48,5 +54,6 @@ app.on('second-instance', () => {
 // No cerrar la app cuando se cierran todas las ventanas (queda en bandeja)
 app.on('window-all-closed', () => { /* no salir — queda en bandeja */ });
 
-// Limpieza al salir
-app.on('before-quit', () => stopRealtimeListener());
+// Limpieza al salir. `before-quit` es síncrono, lanzamos la promesa pero
+// no la esperamos: con cerrar canales en background es suficiente.
+app.on('before-quit', () => { void stopRealtimeListener(); });
