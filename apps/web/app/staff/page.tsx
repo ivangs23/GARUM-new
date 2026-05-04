@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { supabaseBrowser as supabase } from "@/lib/supabase-browser";
 import { Printer, ChefHat, Wine, LogOut, CheckCircle, Clock } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { filterItems, hasItemsFor, type Destination, type RoutableItem } from "@/lib/order-routing";
+import { filterItems, hasItemsFor, type Destination, type RoutableItem } from "@garum/shared/order-routing";
 
 type OrderItem = RoutableItem & {
   id: string;

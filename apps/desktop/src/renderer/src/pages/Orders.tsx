@@ -4,7 +4,7 @@ import {
   filterItems,
   hasItemsFor,
   type Destination,
-} from '../../../shared/order-routing';
+} from '@garum/shared/order-routing';
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────
 

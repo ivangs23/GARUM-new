@@ -5,7 +5,7 @@ import {
   effectiveDestination,
   normalize,
   BARRA_KEYWORDS,
-} from '../../src/shared/order-routing';
+} from '../src/order-routing';
 
 describe('normalize', () => {
   it('quita acentos y baja a minúsculas', () => {
@@ -62,10 +62,10 @@ describe('effectiveDestination — fallback por keywords', () => {
 
 describe('filterItems', () => {
   const items = [
-    { name: 'Croquetas',     destination: 'cocina' as const },
-    { name: 'Vino Rioja',    destination: 'barra'  as const },
-    { name: 'Café',          /* legacy */ },
-    { name: 'Tortilla',      /* legacy */ },
+    { name: 'Croquetas',  destination: 'cocina' as const },
+    { name: 'Vino Rioja', destination: 'barra'  as const },
+    { name: 'Café'        /* legacy */ },
+    { name: 'Tortilla'    /* legacy */ },
   ];
 
   it('cocina devuelve solo items de cocina', () => {

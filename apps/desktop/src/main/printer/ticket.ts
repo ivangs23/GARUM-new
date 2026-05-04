@@ -1,6 +1,6 @@
 import { ThermalPrinter, PrinterTypes, CharacterSet } from 'node-thermal-printer';
 import type { Order, OrderItem, PrinterConfig } from '../../shared/types';
-import { filterItems, type Destination } from '../../shared/order-routing';
+import { filterItems, type Destination } from '@garum/shared/order-routing';
 
 /**
  * Sanea texto para PC858_EURO. node-thermal-printer hace lo suyo, pero
