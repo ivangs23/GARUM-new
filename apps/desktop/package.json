@@ -1,0 +1,83 @@
+{
+  "name": "garum-desktop",
+  "version": "1.0.0",
+  "description": "Panel de comandas y gestión de impresoras — Garum Vinoteca",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "ELECTRON_RUN_AS_NODE= electron-vite dev",
+    "build": "electron-vite build",
+    "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.web.json --noEmit",
+    "gen-icons": "node scripts/gen-icons.cjs",
+    "dist:win": "npm run gen-icons && npm run build && electron-builder --win",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
+    "pretest:e2e": "npm run build",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
+  },
+  "build": {
+    "appId": "com.garum.desktop",
+    "productName": "Garum Desktop",
+    "copyright": "Garum Vinoteca",
+    "directories": {
+      "buildResources": "resources",
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": "resources",
+        "filter": [
+          "*.png",
+          "*.ico"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "resources/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "runAfterFinish": true,
+      "shortcutName": "Garum Desktop"
+    }
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.102.1",
+    "node-thermal-printer": "^4.6.0",
+    "ws": "^8.20.0"
+  },
+  "devDependencies": {
+    "@electron-toolkit/preload": "^3.0.0",
+    "@electron-toolkit/utils": "^3.0.0",
+    "@playwright/test": "^1.59.1",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/ws": "^8.18.1",
+    "@vitejs/plugin-react": "^4",
+    "electron": "^33",
+    "electron-builder": "^25",
+    "electron-vite": "^2",
+    "playwright": "^1.59.1",
+    "react": "^19",
+    "react-dom": "^19",
+    "typescript": "^5",
+    "vite": "^5",
+    "vitest": "^1.6.1"
+  }
+}
