@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { startOfTodayMadridIso } from './today';
+import { startOfTodayMadridIso } from '@garum/shared/format';
 import type { Order } from '../shared/types';
 
 /**

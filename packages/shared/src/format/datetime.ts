@@ -3,17 +3,20 @@
  * Maneja CET/CEST automáticamente vía Intl.
  */
 export function startOfTodayMadridIso(now: Date = new Date()): string {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Europe/Madrid',
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Madrid",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
     hour12: false,
   }).formatToParts(now);
 
-  const get = (type: string) => parts.find(p => p.type === type)?.value ?? '0';
-  const hRaw = get('hour');
-  const h = parseInt(hRaw === '24' ? '00' : hRaw, 10);
-  const m = parseInt(get('minute'), 10);
-  const s = parseInt(get('second'), 10);
+  const get = (type: string) =>
+    parts.find((p) => p.type === type)?.value ?? "0";
+  const hRaw = get("hour");
+  const h = parseInt(hRaw === "24" ? "00" : hRaw, 10);
+  const m = parseInt(get("minute"), 10);
+  const s = parseInt(get("second"), 10);
   const ms = now.getMilliseconds();
 
   const elapsedMs = ((h * 60 + m) * 60 + s) * 1000 + ms;
@@ -21,9 +24,19 @@ export function startOfTodayMadridIso(now: Date = new Date()): string {
   return todayMidnightUtc.toISOString();
 }
 
-const madridDayFmt = new Intl.DateTimeFormat('en-CA', {
-  timeZone: 'Europe/Madrid',
-  year: 'numeric', month: '2-digit', day: '2-digit',
+/**
+ * Alias of `startOfTodayMadridIso`. Returns the ISO UTC timestamp for the
+ * start of the Madrid calendar day containing `date`.
+ */
+export function madridMidnightISO(date: Date = new Date()): string {
+  return startOfTodayMadridIso(date);
+}
+
+const madridDayFmt = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Europe/Madrid",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
 });
 
 /**
@@ -31,6 +44,14 @@ const madridDayFmt = new Intl.DateTimeFormat('en-CA', {
  */
 export function isToday(iso: string, now: Date = new Date()): boolean {
   return madridDayFmt.format(new Date(iso)) === madridDayFmt.format(now);
+}
+
+/**
+ * Returns true if two Date objects fall on the same calendar day in
+ * Europe/Madrid timezone (handles CET/CEST automatically).
+ */
+export function isSameMadridDay(a: Date, b: Date): boolean {
+  return madridDayFmt.format(a) === madridDayFmt.format(b);
 }
 
 /**

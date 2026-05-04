@@ -12,7 +12,7 @@ import {
   type MaintenanceState,
 } from '../shared/types';
 import { diag } from './diag';
-import { startOfTodayMadridIso, isToday, msUntilNextMidnightMadrid } from './today';
+import { startOfTodayMadridIso, isToday, msUntilNextMidnightMadrid } from '@garum/shared/format';
 
 let supabase: SupabaseClient | null = null;
 let channel: RealtimeChannel | null = null;
