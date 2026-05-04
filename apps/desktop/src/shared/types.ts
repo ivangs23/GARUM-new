@@ -1,32 +1,18 @@
 // Tipos compartidos entre main process y renderer
 
-export type OrderItem = {
-  id: string;
-  name: string;
-  price: number;
-  quantity: number;
-  destination?: 'cocina' | 'barra' | null;
-};
+// Re-export domain types from shared package
+export type { Order, OrderItem, OrderRow, OrderInsert } from '@garum/shared/domain';
+export type { Product, Category, ProductExtra } from '@garum/shared/domain';
 
 /**
  * Estado por destino. 'na' = el pedido no tiene items para ese destino
  * (ver migration 007 en Garum/supabase). El estado global `staff_status`
  * se deriva en la BD vía trigger; aquí lo conservamos por compatibilidad.
+ *
+ * Alias del tipo de columna real en la base de datos — mantenido aquí
+ * para no romper consumers del desktop que importan StaffSubStatus.
  */
 export type StaffSubStatus = 'pending' | 'done' | 'na';
-
-export type Order = {
-  id: string;
-  table_number: number;
-  items: OrderItem[];
-  total_amount: number;
-  payment_status: 'pending' | 'paid' | 'cancelled';
-  staff_status: 'pending' | 'done';
-  staff_status_kitchen: StaffSubStatus;
-  staff_status_bar:     StaffSubStatus;
-  printed_at: string | null;
-  created_at: string;
-};
 
 export type PrinterAdapter = 'escpos-tcp' | 'escpos-usb' | 'windows';
 

@@ -10,7 +10,8 @@
     "paths": {
       "@shared/*": ["src/shared/*"],
       "@garum/shared/order-routing": ["../../packages/shared/src/order-routing.ts"],
-      "@garum/shared/format": ["../../packages/shared/src/format/index.ts"]
+      "@garum/shared/format": ["../../packages/shared/src/format/index.ts"],
+      "@garum/shared/domain": ["../../packages/shared/src/domain/index.ts"]
     }
   },
   "include": [
