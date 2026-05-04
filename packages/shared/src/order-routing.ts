@@ -12,7 +12,8 @@
  * funcionando con un único set de keywords compartido por web y desktop.
  */
 
-export type Destination = "cocina" | "barra";
+import type { Destination } from "./constants/destinations";
+export type { Destination };
 
 export type RoutableItem = {
   id?: string;
