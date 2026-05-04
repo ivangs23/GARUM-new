@@ -28,6 +28,7 @@
     ]
   },
   "dependencies": {
+    "@garum/shared": "workspace:*",
     "@stripe/react-stripe-js": "^6.2.0",
     "@stripe/stripe-js": "^9.1.0",
     "@supabase/ssr": "^0.10.0",

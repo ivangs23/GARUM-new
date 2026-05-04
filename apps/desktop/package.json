@@ -57,6 +57,7 @@
     }
   },
   "dependencies": {
+    "@garum/shared": "workspace:*",
     "@supabase/supabase-js": "^2.102.1",
     "node-thermal-printer": "^4.6.0",
     "ws": "^8.20.0"

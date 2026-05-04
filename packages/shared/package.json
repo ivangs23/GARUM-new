@@ -1,0 +1,22 @@
+{
+  "name": "@garum/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./order-routing": "./src/order-routing.ts",
+    "./database": "./src/database.types.ts",
+    "./domain": "./src/domain/index.ts",
+    "./format": "./src/format/index.ts",
+    "./constants": "./src/constants/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
