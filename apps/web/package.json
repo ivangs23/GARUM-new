@@ -1,0 +1,59 @@
+{
+  "name": "temp_garum",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3001",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky",
+    "test:unit": "node --experimental-strip-types --test tests/unit/**/*.test.ts",
+    "test:integration": "node --experimental-strip-types --env-file=.env.local --test tests/integration/**/*.test.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:public": "playwright test --project=public --project=public-mobile",
+    "test:e2e:admin": "playwright test --project=admin",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:report": "playwright show-report"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,css}": [
+      "prettier --write"
+    ]
+  },
+  "dependencies": {
+    "@stripe/react-stripe-js": "^6.2.0",
+    "@stripe/stripe-js": "^9.1.0",
+    "@supabase/ssr": "^0.10.0",
+    "@supabase/supabase-js": "^2.102.1",
+    "@types/qrcode": "^1.5.6",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.7.0",
+    "next": "16.2.2",
+    "qrcode": "^1.5.4",
+    "qrcode.react": "^4.2.0",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "stripe": "^22.0.0",
+    "tailwind-merge": "^3.5.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "dotenv": "^17.4.2",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "prettier": "^3.8.3",
+    "typescript": "^5"
+  }
+}
