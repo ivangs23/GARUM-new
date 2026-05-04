@@ -11,7 +11,7 @@
     "db:types": "supabase gen types typescript --project-id vjrttuhdrkljcdixartp > packages/shared/src/database.types.ts",
     "web:dev": "pnpm --filter web dev",
     "web:build": "pnpm --filter web build",
-    "desktop:dev": "pnpm --filter desktop dev",
+    "desktop:dev": "pnpm --filter garum-desktop dev",
     "prepare": "husky"
   },
   "devDependencies": {
