@@ -11,7 +11,7 @@ import CheckoutDialog from "@/components/CheckoutDialog";
 import { supabase } from "@/lib/supabase";
 import { buildCategoryTree, countSubtreeProducts, type CategoryNode } from "@/lib/category-tree";
 import type { CartItem } from "@/context/CartContext";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@garum/shared/database";
 
 type SettingRow = Database["public"]["Tables"]["settings"]["Row"];
 type ProductRow = Database["public"]["Tables"]["products"]["Row"];
