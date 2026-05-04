@@ -11,10 +11,28 @@
     "db:types": "supabase gen types typescript --project-id vjrttuhdrkljcdixartp > packages/shared/src/database.types.ts",
     "web:dev": "pnpm --filter web dev",
     "web:build": "pnpm --filter web build",
-    "desktop:dev": "pnpm --filter desktop dev"
+    "desktop:dev": "pnpm --filter desktop dev",
+    "prepare": "husky"
   },
   "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.2",
+    "prettier": "^3.4.2",
     "typescript": "^5.7.2"
+  },
+  "lint-staged": {
+    "apps/web/**/*.{ts,tsx,js,jsx}": [
+      "pnpm --filter web exec eslint --fix"
+    ],
+    "apps/desktop/**/*.{ts,tsx,js,jsx}": [
+      "pnpm --filter garum-desktop exec eslint --fix"
+    ],
+    "packages/shared/**/*.ts": [
+      "pnpm --filter @garum/shared exec tsc --noEmit"
+    ],
+    "**/*.{json,md,css,yml,yaml}": [
+      "prettier --write"
+    ]
   },
   "engines": {
     "node": ">=20",
