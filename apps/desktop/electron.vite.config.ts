@@ -14,14 +14,14 @@ export default defineConfig(({ mode }) => {
 
   return {
     main: {
-      plugins: [externalizeDepsPlugin()],
+      plugins: [externalizeDepsPlugin({ exclude: ['@garum/shared'] })],
       resolve: {
         alias: { '@shared': resolve('src/shared') },
       },
       define: mainEnvDefines,
     },
     preload: {
-      plugins: [externalizeDepsPlugin()],
+      plugins: [externalizeDepsPlugin({ exclude: ['@garum/shared'] })],
     },
     renderer: {
       plugins: [react()],
