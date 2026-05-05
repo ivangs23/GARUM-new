@@ -1,17 +1,20 @@
 {
   "compilerOptions": {
-    "target":           "ES2022",
-    "module":           "CommonJS",
+    "target": "ES2022",
+    "module": "CommonJS",
     "moduleResolution": "node",
-    "strict":           true,
-    "skipLibCheck":     true,
-    "outDir":           "dist",
-    "baseUrl":          ".",
+    "strict": true,
+    "skipLibCheck": true,
+    "outDir": "dist",
+    "baseUrl": ".",
     "paths": {
       "@shared/*": ["src/shared/*"],
-      "@garum/shared/order-routing": ["../../packages/shared/src/order-routing.ts"],
+      "@garum/shared/order-routing": [
+        "../../packages/shared/src/order-routing.ts"
+      ],
       "@garum/shared/format": ["../../packages/shared/src/format/index.ts"],
-      "@garum/shared/domain": ["../../packages/shared/src/domain/index.ts"]
+      "@garum/shared/domain": ["../../packages/shared/src/domain/index.ts"],
+      "@garum/shared/ticket": ["../../packages/shared/src/ticket/index.ts"]
     }
   },
   "include": [
