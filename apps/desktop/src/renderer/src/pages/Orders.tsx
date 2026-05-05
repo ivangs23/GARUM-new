@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { Order, OrderItem, StaffSubStatus } from '../../../shared/types';
+import type { Order, OrderItem, StaffSubStatus, PrinterConfig } from '../../../shared/types';
 import {
   filterItems,
   hasItemsFor,
   type Destination,
 } from '@garum/shared/order-routing';
+import { PreviewModal } from '../components/PreviewModal';
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────
 
@@ -26,10 +27,11 @@ function useElapsed(created_at: string): string {
 
 // ─── Tarjeta de pedido ────────────────────────────────────────────────────────
 
-function OrderCard({ order, dest, onDone }: {
+function OrderCard({ order, dest, onDone, onPreview }: {
   order: Order;
   dest: Destination;
   onDone: (id: string, dest: Destination) => void;
+  onPreview: (order: Order) => void;
 }) {
   const subStatus: StaffSubStatus =
     dest === 'cocina' ? order.staff_status_kitchen : order.staff_status_bar;
@@ -78,33 +80,52 @@ function OrderCard({ order, dest, onDone }: {
         ))}
       </ul>
 
-      {/* Acción solo en pendientes */}
-      {!isDone && (
+      {/* Acciones */}
+      <div style={{ display: 'flex', gap: '0.5rem' }}>
         <button
-          onClick={() => onDone(order.id, dest)}
+          type="button"
+          onClick={() => onPreview(order)}
           style={{
-            background: 'rgba(74,222,128,.1)', border: '1px solid rgba(74,222,128,.3)',
-            borderRadius: 8, color: 'var(--green)', padding: '0.5rem',
-            fontWeight: 600, fontSize: '0.8rem', letterSpacing: '0.05em',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
-            transition: 'all 0.15s',
+            padding: '6px 12px',
+            background: 'transparent',
+            color: '#aaa',
+            border: '1px solid #333',
+            borderRadius: 4,
+            cursor: 'pointer',
+            fontSize: 13,
           }}
-          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(74,222,128,.2)')}
-          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(74,222,128,.1)')}
         >
-          ✓ LISTO
+          Vista previa
         </button>
-      )}
+        {!isDone && (
+          <button
+            onClick={() => onDone(order.id, dest)}
+            style={{
+              flex: 1,
+              background: 'rgba(74,222,128,.1)', border: '1px solid rgba(74,222,128,.3)',
+              borderRadius: 8, color: 'var(--green)', padding: '0.5rem',
+              fontWeight: 600, fontSize: '0.8rem', letterSpacing: '0.05em',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(74,222,128,.2)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(74,222,128,.1)')}
+          >
+            ✓ LISTO
+          </button>
+        )}
+      </div>
     </div>
   );
 }
 
 // ─── Columna ──────────────────────────────────────────────────────────────────
 
-function Column({ dest, orders, onDone }: {
+function Column({ dest, orders, onDone, onPreview }: {
   dest: Destination;
   orders: Order[];
   onDone: (id: string, dest: Destination) => void;
+  onPreview: (order: Order) => void;
 }) {
   const active = orders.filter(o => hasItemsFor(o.items, dest));
   const subStatus = (o: Order): StaffSubStatus =>
@@ -142,10 +163,10 @@ function Column({ dest, orders, onDone }: {
       {/* Pedidos */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', overflowY: 'auto' }}>
         {pending.map(o => (
-          <OrderCard key={o.id + dest} order={o} dest={dest} onDone={onDone} />
+          <OrderCard key={o.id + dest} order={o} dest={dest} onDone={onDone} onPreview={onPreview} />
         ))}
         {done.map(o => (
-          <OrderCard key={o.id + dest} order={o} dest={dest} onDone={onDone} />
+          <OrderCard key={o.id + dest} order={o} dest={dest} onDone={onDone} onPreview={onPreview} />
         ))}
         {pending.length === 0 && done.length === 0 && (
           <div style={{
@@ -166,6 +187,8 @@ function Column({ dest, orders, onDone }: {
 export default function Orders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [error, setError]   = useState<string | null>(null);
+  const [previewOrder, setPreviewOrder] = useState<Order | null>(null);
+  const [printers, setPrinters] = useState<PrinterConfig[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const upsert = useCallback((order: Order) => {
@@ -208,6 +231,10 @@ export default function Orders() {
       audioRef.current = null;
     };
   }, [upsert, remove]);
+
+  useEffect(() => {
+    window.api.getConfig().then((cfg) => setPrinters(cfg.printers));
+  }, []);
 
   /**
    * Marca listo SOLO el destino concreto. Optimistic update con
@@ -266,9 +293,17 @@ export default function Orders() {
         display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem',
         padding: '1rem 1.5rem', overflowY: 'auto',
       }}>
-        <Column dest="cocina" orders={orders} onDone={markDone} />
-        <Column dest="barra"  orders={orders} onDone={markDone} />
+        <Column dest="cocina" orders={orders} onDone={markDone} onPreview={setPreviewOrder} />
+        <Column dest="barra"  orders={orders} onDone={markDone} onPreview={setPreviewOrder} />
       </div>
+
+      {previewOrder && (
+        <PreviewModal
+          order={previewOrder}
+          printers={printers}
+          onClose={() => setPreviewOrder(null)}
+        />
+      )}
     </div>
   );
 }
