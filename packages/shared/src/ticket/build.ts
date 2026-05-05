@@ -49,7 +49,7 @@ export function buildTicketLines(
   if (items.length === 0) {
     return [
       ...header,
-      { kind: "text", text: `Sin items para ${destination}`, align: "center" },
+      { kind: "text", text: `Sin ítems para ${destination}`, align: "center" },
       { kind: "cut" },
     ];
   }

@@ -120,4 +120,20 @@ describe("buildTicketLines - pedido footer", () => {
     const t = texts(lines);
     expect(t).toContain("Pedido #E-0001");
   });
+
+  it("does not crash with order id shorter than 6 chars", () => {
+    const shortOrder = { ...exampleOrder, id: "ab12" };
+    const lines = buildTicketLines(shortOrder, "all");
+    const t = texts(lines);
+    expect(t).toContain("Pedido #AB12");
+  });
+});
+
+describe("buildTicketLines - mesa edge cases", () => {
+  it("renders MESA 0 for the test print order", () => {
+    const testPrintOrder = { ...exampleOrder, table_number: 0 };
+    const lines = buildTicketLines(testPrintOrder, "all");
+    const t = texts(lines);
+    expect(t).toContain("MESA 0");
+  });
 });
