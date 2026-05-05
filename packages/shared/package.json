@@ -9,7 +9,8 @@
     "./database": "./src/database.types.ts",
     "./domain": "./src/domain/index.ts",
     "./format": "./src/format/index.ts",
-    "./constants": "./src/constants/index.ts"
+    "./constants": "./src/constants/index.ts",
+    "./ticket": "./src/ticket/index.ts"
   },
   "scripts": {
     "test": "vitest run",
