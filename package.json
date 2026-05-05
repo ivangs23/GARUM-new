@@ -25,7 +25,7 @@
       "pnpm --filter web exec eslint --fix"
     ],
     "packages/shared/**/*.ts": [
-      "pnpm --filter @garum/shared exec tsc --noEmit"
+      "bash -c 'pnpm --filter @garum/shared exec tsc --noEmit'"
     ],
     "**/*.{json,md,css,yml,yaml}": [
       "prettier --write"
