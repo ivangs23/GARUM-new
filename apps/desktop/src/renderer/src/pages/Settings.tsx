@@ -422,8 +422,17 @@ function PrinterRow({
           {showPreview ? 'Ocultar vista previa' : 'Vista previa de ticket'}
         </button>
         {showPreview && (
-          <div style={{ marginTop: 16, display: 'flex', justifyContent: 'center' }}>
-            <TicketPreview order={exampleOrder} destination={printer.destination} />
+          <div
+            style={{
+              marginTop: 16,
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 24,
+              justifyContent: 'center',
+            }}
+          >
+            <TicketPreview order={exampleOrder} destination="cocina" />
+            <TicketPreview order={exampleOrder} destination="barra" />
           </div>
         )}
       </div>
