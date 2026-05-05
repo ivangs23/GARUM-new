@@ -1,0 +1,58 @@
+.ticket-paper {
+  width: 320px;
+  margin: 0 auto;
+  background: #fafafa;
+  color: #111;
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: 13px;
+  line-height: 1.4;
+  padding: 24px 18px 32px;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.08),
+    0 8px 24px rgba(0, 0, 0, 0.12);
+  border-radius: 2px;
+  position: relative;
+}
+
+.ticket-paper__inner > * {
+  white-space: pre-wrap;
+}
+
+.ticket-paper__line {
+  display: block;
+}
+
+.ticket-paper__line--center {
+  text-align: center;
+}
+
+.ticket-paper__line--right {
+  text-align: right;
+}
+
+.ticket-paper__line--bold {
+  font-weight: 700;
+}
+
+.ticket-paper__line--big {
+  font-size: 22px;
+  line-height: 1.2;
+  letter-spacing: 0.5px;
+}
+
+.ticket-paper__divider {
+  border: 0;
+  border-top: 1px dashed #555;
+  margin: 8px 0;
+}
+
+.ticket-paper__newline {
+  height: 0.6em;
+}
+
+.ticket-paper__cut {
+  margin-top: 12px;
+  color: #888;
+  letter-spacing: 1px;
+  text-align: center;
+}
