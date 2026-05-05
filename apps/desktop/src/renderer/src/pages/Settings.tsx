@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { AppConfig, PrinterConfig, DiscoveredPrinter } from '../../../shared/types';
+import { TicketPreview } from '../components/TicketPreview';
+import { exampleOrder } from '@garum/shared/ticket';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -324,6 +326,8 @@ function PrinterRow({
   onDelete:  () => void;
   onTest:    () => void;
 }) {
+  const [showPreview, setShowPreview] = useState(false);
+
   const set = <K extends keyof PrinterConfig>(key: K, value: PrinterConfig[K]) =>
     onChange({ ...printer, [key]: value });
 
@@ -408,6 +412,21 @@ function PrinterRow({
             onChange={e => set('printerName', e.target.value)} />
         </Field>
       )}
+
+      <div style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+        <button
+          type="button"
+          onClick={() => setShowPreview((v) => !v)}
+          style={{ ...ghostBtn }}
+        >
+          {showPreview ? 'Ocultar vista previa' : 'Vista previa de ticket'}
+        </button>
+        {showPreview && (
+          <div style={{ marginTop: 16, display: 'flex', justifyContent: 'center' }}>
+            <TicketPreview order={exampleOrder} destination={printer.destination} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
