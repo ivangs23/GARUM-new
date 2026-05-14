@@ -3,18 +3,28 @@
 import React, { useState, useEffect } from 'react';
 import { CartContext, CartItem } from './CartContext';
 
+function readPersistedCart(): CartItem[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem('garum-cart');
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as CartItem[]) : [];
+  } catch {
+    localStorage.removeItem('garum-cart');
+    return [];
+  }
+}
+
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>([]);
+  // Lazy initializer: leer una sola vez en el primer render del cliente, sin
+  // ejecutarlo en SSR. Evita un useEffect → setState al montar que dispara
+  // un re-render extra y rompe la regla react-hooks/set-state-in-effect.
+  const [items, setItems] = useState<CartItem[]>(readPersistedCart);
 
-  // Cargar carrito guardado (por si refrescan la página por error)
-  useEffect(() => {
-    const savedCart = localStorage.getItem('garum-cart');
-    if (savedCart) {
-      try { setItems(JSON.parse(savedCart)); } catch { localStorage.removeItem('garum-cart'); }
-    }
-  }, []);
-
-  // Guardar cambios en el carrito
+  // Sincronizar al storage cuando cambia el carrito. Este effect SÍ es
+  // correcto: actualiza un sistema externo (localStorage) en respuesta a
+  // estado React, no llama setState.
   useEffect(() => {
     localStorage.setItem('garum-cart', JSON.stringify(items));
   }, [items]);

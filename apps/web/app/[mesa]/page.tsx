@@ -643,11 +643,16 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
     ? filterTreeByWine(rawCurrentCategory, currentHasWines ? wineFilter : "all")
     : null;
 
-  // Reset del filtro al cambiar de categoría raíz
+  // Reset del filtro al cambiar de categoría raíz. Patrón recomendado por
+  // React 19: comparar el prop derivado contra el valor anterior dentro del
+  // render — setState durante el render fuerza un re-render adicional pero
+  // evita el cascading-renders que dispara setState dentro de un useEffect.
   const rootSlug = categoryPath[0] ?? "";
-  useEffect(() => {
+  const [prevRootSlug, setPrevRootSlug] = useState(rootSlug);
+  if (prevRootSlug !== rootSlug) {
+    setPrevRootSlug(rootSlug);
     setWineFilter("all");
-  }, [rootSlug]);
+  }
 
   if (loading)
     return (

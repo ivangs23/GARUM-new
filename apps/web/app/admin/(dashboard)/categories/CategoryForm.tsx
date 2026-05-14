@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { supabaseBrowser as supabase } from '@/lib/supabase-browser';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
-import { buildCategoryTree, flattenTree, collectDescendantIds } from '@/lib/category-tree';
+import { buildCategoryTree, flattenTree, collectDescendantIds, type CategoryNode } from '@/lib/category-tree';
 
 type Category = {
   id?: string;
@@ -44,7 +44,12 @@ export default function CategoryForm({
 
   // Build indented options for the parent dropdown (excluding self + its descendants)
   const descendantIds = initial?.id
-    ? collectDescendantIds({ ...initial as any, children: [] } as any)
+    ? collectDescendantIds({
+        id: initial.id,
+        name: initial.name,
+        parent_id: initial.parent_id,
+        children: [],
+      } as CategoryNode)
     : [];
   const parentOptions = flattenTree(
     buildCategoryTree(allCategories.filter(c => c.id !== initial?.id && !descendantIds.includes(c.id)))
@@ -59,7 +64,7 @@ export default function CategoryForm({
       const selfNode = buildCategoryTree(
         allCategories.map(c => c.id === initial.id ? { ...c, parent_id: null } : c)
       ).find(n => n.id === initial.id);
-      if (selfNode && collectDescendantIds(selfNode as any).includes(form.parent_id)) {
+      if (selfNode && collectDescendantIds(selfNode).includes(form.parent_id)) {
         setError('No puedes seleccionar un descendiente como categoría padre.');
         return;
       }

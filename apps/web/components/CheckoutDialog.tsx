@@ -157,22 +157,26 @@ function CheckoutForm({
   );
 }
 
-export default function CheckoutDialog({ open, onClose, items, mesa, totalAmount, labels }: Props) {
+// El estado del diálogo (clientSecret, loadError) vive en este sub-componente
+// que SOLO se monta cuando `open=true`. Al cerrar el diálogo el padre deja de
+// renderizar este nodo, React lo desmonta, y todo el estado interno
+// desaparece. Esto evita resetear estado manualmente dentro de un useEffect,
+// que es exactamente lo que la regla react-hooks/set-state-in-effect prohíbe.
+function CheckoutDialogContent({
+  onClose,
+  items,
+  mesa,
+  totalAmount,
+  labels,
+}: Omit<Props, "open">) {
   const [clientSecret, setClientSecret] = useState("");
   const [loadError, setLoadError] = useState("");
   const dialogRef = useRef<HTMLDivElement>(null);
-  const abortRef = useRef<AbortController | null>(null);
 
-  // Pide un PaymentIntent cuando se abre el diálogo
+  // Pide un PaymentIntent al montar. Solo se ejecuta una vez por apertura
+  // porque al cerrar el diálogo el componente se desmonta.
   useEffect(() => {
-    if (!open) {
-      setClientSecret("");
-      setLoadError("");
-      abortRef.current?.abort();
-      return;
-    }
     const ctrl = new AbortController();
-    abortRef.current = ctrl;
     (async () => {
       try {
         const res = await fetch("/api/payment-intent", {
@@ -181,8 +185,9 @@ export default function CheckoutDialog({ open, onClose, items, mesa, totalAmount
           body: JSON.stringify({ items, mesa }),
           signal: ctrl.signal,
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || labels.errorGeneric);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.error || labels.errorGeneric);
+        if (!data?.clientSecret) throw new Error(labels.errorGeneric);
         setClientSecret(data.clientSecret);
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
@@ -190,29 +195,25 @@ export default function CheckoutDialog({ open, onClose, items, mesa, totalAmount
       }
     })();
     return () => ctrl.abort();
-  }, [open, items, mesa, labels.errorGeneric]);
+  }, [items, mesa, labels.errorGeneric]);
 
   // Cierra con Escape
   useEffect(() => {
-    if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  }, [onClose]);
 
-  // Bloquea scroll del body
+  // Bloquea scroll del body mientras el diálogo está abierto
   useEffect(() => {
-    if (!open) return;
     document.body.style.overflow = "hidden";
     dialogRef.current?.focus();
     return () => {
       document.body.style.overflow = "";
     };
-  }, [open]);
-
-  if (!open) return null;
+  }, []);
 
   const appearance = {
     theme: "stripe" as const,
@@ -363,4 +364,14 @@ export default function CheckoutDialog({ open, onClose, items, mesa, totalAmount
       `}</style>
     </div>
   );
+}
+
+// Wrapper público: monta/desmonta `CheckoutDialogContent` según `open`.
+// Toda la lógica con estado vive en el sub-componente para que al cerrar
+// React lo desmonte y limpie el estado sin necesidad de setState en effects.
+export default function CheckoutDialog(props: Props) {
+  if (!props.open) return null;
+  const { open: _open, ...rest } = props;
+  void _open;
+  return <CheckoutDialogContent {...rest} />;
 }

@@ -225,8 +225,8 @@ export default function StaffPage() {
   const markDone = async (id: string, dest: Destination) => {
     const column = dest === "cocina" ? "staff_status_kitchen" : "staff_status_bar";
 
-    // Optimistic update
-    const prev = orders;
+    // Optimistic update con setState funcional para evitar closure stale
+    // si el usuario marca dos pedidos casi simultáneamente.
     setOrders((curr) =>
       curr.map((o) => (o.id === id ? { ...o, [column]: "done" as StaffStatus } : o))
     );
@@ -239,7 +239,11 @@ export default function StaffPage() {
 
     if (error) {
       console.error("[Staff] Error marcando como listo:", error.message);
-      setOrders(prev); // rollback
+      // Rollback localizado: solo revierte la fila afectada al estado pending,
+      // sin pisar otras mutaciones que hayan podido entrar mientras tanto.
+      setOrders((curr) =>
+        curr.map((o) => (o.id === id ? { ...o, [column]: "pending" as StaffStatus } : o))
+      );
       alert("No se pudo marcar como listo. Revisa la conexión y vuelve a intentar.");
     }
   };

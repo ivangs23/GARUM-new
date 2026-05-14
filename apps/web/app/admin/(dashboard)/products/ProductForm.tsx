@@ -105,9 +105,12 @@ export default function ProductForm({ initial, categories, onSuccess, onCancel }
 
     let productId = initial?.id;
 
-    // Remove relations from base data
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { product_extras: _extras, ...baseData } = form as any;
+    // Separamos `product_extras` (relación) del payload base. El campo es
+    // opcional porque sólo aparece cuando estamos editando un producto que
+    // ya tenía extras cargados, no en la creación.
+    const formWithExtras = form as ProductData & { product_extras?: Extra[] };
+    const { product_extras: _extras, ...baseData } = formWithExtras;
+    void _extras;
 
     if (productId) {
       const { error } = await supabase.from('products').update(baseData).eq('id', productId);

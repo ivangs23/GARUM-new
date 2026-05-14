@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback } from 'react';
 import es from '../messages/es.json';
 import en from '../messages/en.json';
 
@@ -17,13 +17,20 @@ type LanguageContextType = {
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
-export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>('es');
+type Messages = typeof es;
+type MessagesNode = Messages | Messages[keyof Messages] | string | undefined;
 
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY) as Locale | null;
-    if (saved && (saved === 'es' || saved === 'en')) setLocaleState(saved);
-  }, []);
+function readPersistedLocale(): Locale {
+  if (typeof window === 'undefined') return 'es';
+  const saved = localStorage.getItem(STORAGE_KEY);
+  return saved === 'en' || saved === 'es' ? saved : 'es';
+}
+
+export function LanguageProvider({ children }: { children: React.ReactNode }) {
+  // Lazy initializer: lee localStorage una sola vez en el primer render del
+  // cliente. Sin esto era un useEffect → setState, que dispara cascading
+  // renders y rompe react-hooks/set-state-in-effect.
+  const [locale, setLocaleState] = useState<Locale>(readPersistedLocale);
 
   const setLocale = useCallback((l: Locale) => {
     setLocaleState(l);
@@ -33,10 +40,10 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   // Resuelve una clave con notación de punto, p.ej. "menu.welcomeTitle"
   const t = useCallback((key: string): string => {
     const parts = key.split('.');
-    let node: any = MESSAGES[locale];
+    let node: MessagesNode = MESSAGES[locale];
     for (const part of parts) {
-      if (node == null) return key;
-      node = node[part];
+      if (node == null || typeof node !== 'object') return key;
+      node = (node as Record<string, MessagesNode>)[part];
     }
     return typeof node === 'string' ? node : key;
   }, [locale]);
