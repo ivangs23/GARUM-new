@@ -242,7 +242,6 @@ export default function Orders() {
    */
   const markDone = async (id: string, dest: Destination) => {
     const column = dest === 'cocina' ? 'staff_status_kitchen' : 'staff_status_bar';
-    const prev = orders;
 
     setOrders(curr =>
       curr.map(o => o.id === id ? { ...o, [column]: 'done' as StaffSubStatus } : o),
@@ -252,7 +251,11 @@ export default function Orders() {
       await window.api.markDone({ id, destination: dest });
     } catch (e) {
       console.error('[Orders] markDone failed:', e);
-      setOrders(prev); // rollback
+      // Rollback localizado con setState funcional para evitar pisar
+      // mutaciones simultáneas si el camarero marca varios pedidos seguidos.
+      setOrders(curr =>
+        curr.map(o => o.id === id ? { ...o, [column]: 'pending' as StaffSubStatus } : o),
+      );
       setError('No se pudo marcar como listo. Revisa la conexión.');
       setTimeout(() => setError(null), 4000);
     }

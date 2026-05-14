@@ -35,6 +35,18 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Defensa en profundidad: el workflow de CI ya bloquea el merge si algo
+      # falla, pero si por algún motivo se evita (commits directos, hotfix,
+      # CI saltada) queremos que un push a main rechace antes de desplegar.
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Tests
+        run: pnpm test
+
       - name: Build Next.js app
         run: pnpm --filter web build
 
