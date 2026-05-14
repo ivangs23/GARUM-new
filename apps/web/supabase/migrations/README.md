@@ -27,7 +27,7 @@ más alto.
    de que hay un backup reciente. Las migrations de hoy son seguras
    (sólo añaden columnas y políticas), pero hacer backup es barato.
 
-2. **Aplicar 007 → 012 en orden** desde SQL Editor. Cada archivo es
+2. **Aplicar 007 → 013 en orden** desde SQL Editor. Cada archivo es
    idempotente: usa `ADD COLUMN IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`,
    `CREATE POLICY` con guard, etc. Si te paras a la mitad y reintentas,
    no rompes nada.
@@ -76,6 +76,10 @@ más alto.
 Si necesitas revertir las migrations:
 
 ```sql
+-- 013
+DROP TRIGGER IF EXISTS trg_enforce_anon_orders_update ON orders;
+DROP FUNCTION IF EXISTS enforce_anon_orders_update_columns();
+
 -- 012
 DROP POLICY IF EXISTS "anon_recent_orders_select" ON orders;
 DROP POLICY IF EXISTS "anon_recent_orders_update" ON orders;
