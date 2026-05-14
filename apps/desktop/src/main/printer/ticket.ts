@@ -66,11 +66,24 @@ function emitLine(printer: ThermalPrinter, line: TicketLine): void {
 
 function buildInterface(config: PrinterConfig): string {
   switch (config.adapter) {
-    case "escpos-tcp":
-      return `tcp://${config.host ?? "127.0.0.1"}:${config.port ?? 9100}`;
-    case "windows":
-      return `printer:${config.printerName ?? ""}`;
+    case "escpos-tcp": {
+      if (!config.host) {
+        throw new Error(
+          `Impresora "${config.label}" sin host configurado. Revisa Ajustes → Impresoras.`,
+        );
+      }
+      const port = config.port ?? 9100;
+      return `tcp://${config.host}:${port}`;
+    }
+    case "windows": {
+      if (!config.printerName) {
+        throw new Error(
+          `Impresora "${config.label}" sin nombre Windows configurado.`,
+        );
+      }
+      return `printer:${config.printerName}`;
+    }
     default:
-      return `tcp://${config.host ?? "127.0.0.1"}:${config.port ?? 9100}`;
+      throw new Error(`Impresora "${config.label}": adapter desconocido "${config.adapter}"`);
   }
 }

@@ -256,6 +256,10 @@ export default function StaffPage() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    // refresh() para que el proxy vea las cookies borradas antes de la
+    // navegación; si no, el middleware puede redirigirnos a /staff porque
+    // todavía cree que la sesión existe.
+    router.refresh();
     router.push("/staff/login");
   };
 

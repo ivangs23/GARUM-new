@@ -19,6 +19,9 @@ export default function StaffLoginPage() {
     setError('');
     const { error } = await supabaseBrowser.auth.signInWithPassword({ email, password });
     if (error) { setError('Credenciales incorrectas'); setLoading(false); return; }
+    // Ver comentario equivalente en admin/login: refresh primero para que
+    // el proxy reciba las cookies de sesión recién escritas.
+    router.refresh();
     router.push('/staff');
   };
 

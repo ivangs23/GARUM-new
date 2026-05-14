@@ -27,6 +27,10 @@ export default function AdminLoginPage() {
       return;
     }
 
+    // refresh() fuerza al proxy a re-evaluar con las cookies recién
+    // escritas: sin esto, una navegación client-side puede llegar al
+    // dashboard antes de que el middleware vea la sesión y nos rebote.
+    router.refresh();
     router.push('/admin');
   };
 
