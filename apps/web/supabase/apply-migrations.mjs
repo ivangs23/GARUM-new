@@ -18,7 +18,10 @@ if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
 
 const sql = readFileSync(join(__dir, 'migrations/001_initial_schema.sql'), 'utf8');
 
-const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/exec_sql`, {
+// El endpoint REST `/rpc/exec_sql` solo existe si lo has expuesto a propósito,
+// así que probamos primero por si está disponible. Si responde 404 caemos al
+// endpoint /pg/query de la Management API.
+await fetch(`${SUPABASE_URL}/rest/v1/rpc/exec_sql`, {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -28,7 +31,7 @@ const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/exec_sql`, {
   body: JSON.stringify({ sql }),
 }).catch(() => null);
 
-// Supabase no expone exec_sql via REST, usar el endpoint de Management API
+// Supabase no expone exec_sql via REST por defecto, usar el endpoint de Management API
 const pgRes = await fetch(`${SUPABASE_URL.replace('.supabase.co', '')}/pg/query`, {
   method: 'POST',
   headers: {
