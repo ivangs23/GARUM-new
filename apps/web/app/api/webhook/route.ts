@@ -131,5 +131,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ received: true });
   }
 
+  console.warn(`Webhook: evento no manejado ${event.type} (id=${event.id})`);
   return NextResponse.json({ received: true });
 }

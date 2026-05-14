@@ -6,7 +6,7 @@ Sistema de pedidos mediante QR con pago online integrado (Stripe) y gestión de 
 
 ---
 
-## Next.js 16.2.2 (React 19) — LEER ANTES DE ESCRIBIR CÓDIGO
+## Next.js 16.2.6 (React 19) — LEER ANTES DE ESCRIBIR CÓDIGO
 
 - `params` en page components es una `Promise` — usar `use(params)` en Client Components o `await params` en Server Components.
 - **`"use client"`** obligatorio en cualquier componente que use hooks, eventos del DOM o `<style jsx>`.
@@ -38,23 +38,23 @@ Sistema de pedidos mediante QR con pago online integrado (Stripe) y gestión de 
 
 ## Tech Stack
 
-| Capa | Tecnología |
-|---|---|
-| Framework | Next.js 16.2.2 — App Router |
-| Base de datos | Supabase (PostgreSQL + Auth + Realtime + Storage) |
-| Pagos | Stripe Checkout Sessions — API `2026-03-25.dahlia` |
-| Estilos | CSS global `globals.css` + `admin.css` + `<style jsx>` (solo en Client Components) |
-| Auth | Supabase SSR (`@supabase/ssr`) con cookies — NO localStorage para sesiones de admin/staff |
+| Capa          | Tecnología                                                                                |
+| ------------- | ----------------------------------------------------------------------------------------- |
+| Framework     | Next.js 16.2.6 — App Router                                                               |
+| Base de datos | Supabase (PostgreSQL + Auth + Realtime + Storage)                                         |
+| Pagos         | Stripe (Payment Element + Checkout Sessions) — API `2026-04-22.dahlia`                    |
+| Estilos       | CSS global `globals.css` + `admin.css` + `<style jsx>` (solo en Client Components)        |
+| Auth          | Supabase SSR (`@supabase/ssr`) con cookies — NO localStorage para sesiones de admin/staff |
 
 ---
 
 ## Clientes Supabase — cuál usar en cada caso
 
-| Archivo | Cuándo usarlo |
-|---|---|
-| `lib/supabase.ts` | Solo lectura pública de datos (menú, productos). No gestiona sesión. |
+| Archivo                   | Cuándo usarlo                                                                                                                                      |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lib/supabase.ts`         | Solo lectura pública de datos (menú, productos). No gestiona sesión.                                                                               |
 | `lib/supabase-browser.ts` | **Client Components** que necesitan auth (login, logout, staff page). Usa `createBrowserClient` de `@supabase/ssr` — guarda sesión en **cookies**. |
-| `lib/supabase-server.ts` | **Server Components** y Server Actions que necesitan leer sesión. Usa `createServerClient` de `@supabase/ssr`. |
+| `lib/supabase-server.ts`  | **Server Components** y Server Actions que necesitan leer sesión. Usa `createServerClient` de `@supabase/ssr`.                                     |
 
 > **Error común:** usar `lib/supabase.ts` para hacer login. La sesión queda en `localStorage` y el middleware (que lee cookies) no la ve → bucle de redirecciones.
 
@@ -105,48 +105,53 @@ STRIPE_WEBHOOK_SECRET=              # Obtener en Stripe Dashboard → Webhooks
 ## Esquema Supabase
 
 ### `categories`
-| Campo | Tipo | Descripción |
-|---|---|---|
-| `id` | uuid PK | |
-| `name` | text | Nombre visible |
-| `slug` | text unique | Para anclas de URL |
-| `destination` | text | `'cocina'` o `'barra'` — determina a qué pantalla del staff va |
-| `icon` | text | Nombre de icono Lucide |
-| `sort_order` | int | Orden en la carta |
+
+| Campo         | Tipo        | Descripción                                                    |
+| ------------- | ----------- | -------------------------------------------------------------- |
+| `id`          | uuid PK     |                                                                |
+| `name`        | text        | Nombre visible                                                 |
+| `slug`        | text unique | Para anclas de URL                                             |
+| `destination` | text        | `'cocina'` o `'barra'` — determina a qué pantalla del staff va |
+| `icon`        | text        | Nombre de icono Lucide                                         |
+| `sort_order`  | int         | Orden en la carta                                              |
 
 ### `products`
-| Campo | Tipo | Descripción |
-|---|---|---|
-| `id` | uuid PK | |
-| `category_id` | uuid FK → categories | |
-| `name` | text | |
-| `description` | text | |
-| `price` | numeric(10,2) | En euros |
-| `image_url` | text | URL pública de Supabase Storage (bucket `products`) |
-| `allergen_ids` | int[] | IDs de la tabla `allergens` (1–14, estándar UE) |
-| `is_available` | boolean | |
-| `sort_order` | int | |
+
+| Campo          | Tipo                 | Descripción                                         |
+| -------------- | -------------------- | --------------------------------------------------- |
+| `id`           | uuid PK              |                                                     |
+| `category_id`  | uuid FK → categories |                                                     |
+| `name`         | text                 |                                                     |
+| `description`  | text                 |                                                     |
+| `price`        | numeric(10,2)        | En euros                                            |
+| `image_url`    | text                 | URL pública de Supabase Storage (bucket `products`) |
+| `allergen_ids` | int[]                | IDs de la tabla `allergens` (1–14, estándar UE)     |
+| `is_available` | boolean              |                                                     |
+| `sort_order`   | int                  |                                                     |
 
 ### `product_extras`
-| Campo | Tipo | Descripción |
-|---|---|---|
-| `id` | uuid PK | |
-| `product_id` | uuid FK → products | |
-| `name` | text | |
-| `price` | numeric(10,2) | Coste adicional |
+
+| Campo        | Tipo               | Descripción     |
+| ------------ | ------------------ | --------------- |
+| `id`         | uuid PK            |                 |
+| `product_id` | uuid FK → products |                 |
+| `name`       | text               |                 |
+| `price`      | numeric(10,2)      | Coste adicional |
 
 ### `orders`
-| Campo | Tipo | Descripción |
-|---|---|---|
-| `id` | uuid PK | |
-| `table_number` | int | Número de mesa |
-| `items` | jsonb | Array de `{id, name, price, quantity}` |
-| `total_amount` | numeric(10,2) | En euros |
-| `payment_status` | text | `'pending'` / `'paid'` / `'cancelled'` |
-| `stripe_session_id` | text unique | Para deduplicar webhooks |
-| `created_at` | timestamptz | |
+
+| Campo               | Tipo          | Descripción                            |
+| ------------------- | ------------- | -------------------------------------- |
+| `id`                | uuid PK       |                                        |
+| `table_number`      | int           | Número de mesa                         |
+| `items`             | jsonb         | Array de `{id, name, price, quantity}` |
+| `total_amount`      | numeric(10,2) | En euros                               |
+| `payment_status`    | text          | `'pending'` / `'paid'` / `'cancelled'` |
+| `stripe_session_id` | text unique   | Para deduplicar webhooks               |
+| `created_at`        | timestamptz   |                                        |
 
 ### `allergens`
+
 14 alérgenos oficiales UE, ids 1–14. Seed incluido en `supabase/migrations/001_initial_schema.sql`.
 
 **RLS:** lectura pública en `categories`, `products`, `product_extras`, `allergens`. `orders` solo se inserta públicamente; lectura/actualización requiere auth. Admin gestiona el menú con auth.

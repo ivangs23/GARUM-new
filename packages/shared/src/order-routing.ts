@@ -1,15 +1,8 @@
 /**
- * GARUM — Lógica de routing de items a destino (cocina/barra).
+ * GARUM — routing de items a destino (cocina/barra).
  *
- * IMPORTANTE: este archivo se mantiene en SINCRONÍA con
- *   garum-desktop/src/shared/order-routing.ts
- * Si lo cambias aquí, copia también allí. La fuente de verdad es
- * este archivo (web). Cualquier divergencia es un bug.
- *
- * Por qué existe el fallback: durante un tiempo el carrito guardó items
- * en `orders.items` sin el campo `destination`. La migración 010 los
- * rellena, pero por si quedaran datos huérfanos el fallback sigue
- * funcionando con un único set de keywords compartido por web y desktop.
+ * Fallback por keywords: si un item llega sin `destination` explícito
+ * (datos huérfanos previos a la migración 010), inferimos por nombre.
  */
 
 import type { Destination } from "./constants/destinations";
@@ -24,11 +17,7 @@ export type RoutableItem = {
 };
 
 /**
- * Keywords que mandan un item al destino BARRA cuando no tiene
- * `destination` explícito. Listado conservador y normalizado:
- * todo en minúsculas y sin diacríticos. Usar `normalize()` antes de
- * comparar. Si añades o quitas un keyword aquí, replícalo también en
- * el fichero del desktop.
+ * Keywords BARRA: todo minúsculas + sin diacríticos. Usar `normalize()` antes de comparar.
  */
 export const BARRA_KEYWORDS = [
   "vino",
