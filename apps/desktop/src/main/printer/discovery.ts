@@ -29,7 +29,8 @@ const MAX_CONCURRENCY = 64; // sockets simultáneos
 // Valida que `subnet` sea un prefijo /24 tipo "192.168.1" (tres octetos 0-255).
 // Evita que un valor arbitrario en config.json termine escaneando hosts fuera
 // de la red local del restaurante.
-function isValidSubnetPrefix(s: string): boolean {
+// Exportado únicamente para tests; no la consume nada fuera de este módulo.
+export function isValidSubnetPrefix(s: string): boolean {
   const parts = s.split('.');
   if (parts.length !== 3) return false;
   return parts.every(p => {
