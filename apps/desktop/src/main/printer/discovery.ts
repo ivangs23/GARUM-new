@@ -26,6 +26,19 @@ export async function listWindowsPrinters(): Promise<DiscoveredPrinter[]> {
 const DEFAULT_SUBNETS = ['192.168.1', '192.168.0', '10.0.0'];
 const MAX_CONCURRENCY = 64; // sockets simultáneos
 
+// Valida que `subnet` sea un prefijo /24 tipo "192.168.1" (tres octetos 0-255).
+// Evita que un valor arbitrario en config.json termine escaneando hosts fuera
+// de la red local del restaurante.
+function isValidSubnetPrefix(s: string): boolean {
+  const parts = s.split('.');
+  if (parts.length !== 3) return false;
+  return parts.every(p => {
+    if (!/^\d{1,3}$/.test(p)) return false;
+    const n = Number(p);
+    return n >= 0 && n <= 255;
+  });
+}
+
 /**
  * Escanea subredes en busca de impresoras ESC/POS en puerto 9100.
  *
@@ -38,7 +51,18 @@ export async function scanNetworkPrinters(
   customSubnet?: string,
   timeoutMs: number = 600,
 ): Promise<DiscoveredPrinter[]> {
-  const baseSubnets = customSubnet ? [customSubnet.trim()] : DEFAULT_SUBNETS;
+  let baseSubnets: string[];
+  if (customSubnet) {
+    const trimmed = customSubnet.trim();
+    if (!isValidSubnetPrefix(trimmed)) {
+      console.warn('[discovery] subnet inválida, usando defaults:', trimmed);
+      baseSubnets = DEFAULT_SUBNETS;
+    } else {
+      baseSubnets = [trimmed];
+    }
+  } else {
+    baseSubnets = DEFAULT_SUBNETS;
+  }
   const found: DiscoveredPrinter[] = [];
 
   const targets: string[] = [];

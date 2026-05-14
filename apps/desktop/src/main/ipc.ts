@@ -27,13 +27,22 @@ export function setupIpc(win: BrowserWindow): void {
     async (
       _e,
       payload: string | { id: string; destination: 'cocina' | 'barra' },
-    ) => {
+    ): Promise<void> => {
       // Compatibilidad: el renderer antiguo enviaba solo el id; el nuevo envía
       // {id, destination} para marcar listo solo el destino correspondiente.
       if (typeof payload === 'string') {
-        // Sin destino: marca ambos. Es el comportamiento legacy.
-        await markOrderDone(payload, 'cocina').catch(() => {});
-        await markOrderDone(payload, 'barra').catch(() => {});
+        // Sin destino: marca ambos. Si uno falla (ej. no había pending en ese
+        // destino) seguimos con el otro; pero si ambos fallan propagamos error
+        // para que el renderer pueda hacer rollback.
+        const results = await Promise.allSettled([
+          markOrderDone(payload, 'cocina'),
+          markOrderDone(payload, 'barra'),
+        ]);
+        const failures = results.filter(r => r.status === 'rejected');
+        if (failures.length === results.length) {
+          const first = failures[0] as PromiseRejectedResult;
+          throw first.reason instanceof Error ? first.reason : new Error(String(first.reason));
+        }
       } else {
         await markOrderDone(payload.id, payload.destination);
       }

@@ -4,11 +4,21 @@ import { createTray }         from './tray';
 import { setupIpc }           from './ipc';
 import { startRealtimeListener, stopRealtimeListener } from './realtime';
 import { loadConfig }         from './config';
+import { diag }               from './diag';
 
 // AppUserModelId — necesario en Windows para que las notificaciones
 // muestren el icono y el nombre correctos en vez del de Electron.
 // Coincide con el `appId` del electron-builder.yml.
 app.setAppUserModelId('com.garum.desktop');
+
+// Process-level error handlers — sin esto, una promesa rechazada o un
+// throw síncrono no capturado mata el proceso silenciosamente en producción.
+process.on('unhandledRejection', (reason) => {
+  diag('unhandledRejection:', reason instanceof Error ? reason.stack ?? reason.message : reason);
+});
+process.on('uncaughtException', (err) => {
+  diag('uncaughtException:', err.stack ?? err.message);
+});
 
 // ── Instancia única ───────────────────────────────────────────────────────────
 if (!app.requestSingleInstanceLock()) {

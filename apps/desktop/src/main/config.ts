@@ -1,6 +1,6 @@
 import { app } from 'electron';
 import { join } from 'path';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, unlinkSync } from 'fs';
 import type { AppConfig, PrinterConfig } from '../shared/types';
 
 // ─── Defaults ─────────────────────────────────────────────────────────────────
@@ -48,8 +48,19 @@ function readStored(): StoredConfig {
   }
 }
 
+// Escritura atómica: escribe a un archivo temporal y renombra. fs.renameSync
+// es atómico en POSIX y en Windows (MoveFileEx con REPLACE_EXISTING) desde
+// Node 10, así que un cierre de app a mitad de write no deja config corrupta.
 function writeStored(stored: StoredConfig): void {
-  writeFileSync(configPath(), JSON.stringify(stored, null, 2), 'utf-8');
+  const target = configPath();
+  const tmp = `${target}.${process.pid}.${Date.now()}.tmp`;
+  try {
+    writeFileSync(tmp, JSON.stringify(stored, null, 2), 'utf-8');
+    renameSync(tmp, target);
+  } catch (err) {
+    try { if (existsSync(tmp)) unlinkSync(tmp); } catch { /* ignore */ }
+    throw err;
+  }
 }
 
 export function loadConfig(): AppConfig {
