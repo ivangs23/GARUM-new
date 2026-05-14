@@ -2,10 +2,12 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { headers } from "next/headers";
+import { requireServerEnv } from "@/lib/env";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+const stripe = new Stripe(requireServerEnv("STRIPE_SECRET_KEY"), {
   apiVersion: "2026-04-22.dahlia",
 });
+const STRIPE_WEBHOOK_SECRET = requireServerEnv("STRIPE_WEBHOOK_SECRET");
 
 /**
  * Marca un pedido como pagado de forma idempotente.
@@ -104,7 +106,7 @@ export async function POST(req: Request) {
 
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET!);
+    event = stripe.webhooks.constructEvent(body, sig, STRIPE_WEBHOOK_SECRET);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("Webhook signature error:", message);

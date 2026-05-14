@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import Orders  from './pages/Orders';
 import Settings from './pages/Settings';
 import History from './pages/History';
-import type { MaintenanceState } from '../../shared/types';
+import { IPC, type MaintenanceState } from '../../shared/types';
 
 type Page = 'orders' | 'history' | 'settings';
 
@@ -23,8 +23,8 @@ export default function App() {
     window.api.onConnectionStatus(setStatus);
     window.api.onMaintenanceChanged(setMaintenance);
     return () => {
-      window.api.off('connection:status');
-      window.api.off('maintenance:changed');
+      window.api.off(IPC.CONNECTION_STATUS);
+      window.api.off(IPC.MAINTENANCE_CHANGED);
     };
   }, []);
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { Order, OrderItem, StaffSubStatus, PrinterConfig } from '../../../shared/types';
+import { IPC, type Order, type OrderItem, type StaffSubStatus, type PrinterConfig } from '../../../shared/types';
 import {
   filterItems,
   hasItemsFor,
@@ -225,9 +225,11 @@ export default function Orders() {
     window.api.onOrderRemoved(remove);
 
     return () => {
-      window.api.off('orders:init');
-      window.api.off('orders:new');
-      window.api.off('orders:removed');
+      // Usar la enum IPC evita drift entre suscripción y cleanup si los
+      // literales del canal cambian en shared/types.ts.
+      window.api.off(IPC.ORDERS_INIT);
+      window.api.off(IPC.ORDERS_NEW);
+      window.api.off(IPC.ORDERS_REMOVED);
       audioRef.current = null;
     };
   }, [upsert, remove]);
