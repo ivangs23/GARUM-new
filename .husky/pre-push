@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+
+# Bloquea push si typecheck, lint o tests fallan. El equivalente del workflow
+# de CI corriendo localmente. Si necesitas saltarlo en una emergencia, usa
+# `git push --no-verify` (y ten una buena razón).
+pnpm typecheck && pnpm lint && pnpm test

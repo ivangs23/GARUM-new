@@ -5,20 +5,21 @@ de Supabase porque el proyecto no usa `supabase db push`. **El orden importa**:
 los archivos con número más bajo deben ejecutarse antes que los de número
 más alto.
 
-| Archivo                                  | Qué hace                                                                                                  | ¿Aplicada en producción? |
-| ---------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------ |
-| `001_initial_schema.sql`                 | Tablas base, RLS inicial, alérgenos UE.                                                                   | sí                       |
-| `002_orders_staff_status.sql`            | Columna `staff_status` global.                                                                            | sí                       |
-| `003_category_tree.sql`                  | `parent_id` en `categories`.                                                                              | sí                       |
-| `004_settings.sql`                       | Tabla `settings` con maintenance_enabled.                                                                 | sí                       |
-| `005_pedidos.sql`                        | Tabla `pedidos` (queda renombrada en 009).                                                                | sí                       |
-| `006_wine_fields.sql`                    | Campos de vino + tabla `product_pairings`.                                                                | sí                       |
-| `007_per_destination_status.sql`         | **NUEVO.** `staff_status_kitchen` + `_bar` + trigger derivador.                                           | **pendiente**            |
-| `008_printed_at.sql`                     | **NUEVO.** Columna `printed_at` para anti-duplicación de tickets.                                         | **pendiente**            |
-| `009_drop_pedidos.sql`                   | **NUEVO.** Renombra `pedidos` → `orders_audit_legacy`.                                                    | **pendiente**            |
-| `010_backfill_destination.sql`           | **NUEVO.** Rellena `items.destination` en pedidos antiguos.                                               | **pendiente**            |
-| `011_settings_public_read.sql`           | **NUEVO.** Realtime + lectura anon en `settings`.                                                         | **pendiente**            |
-| `012_orders_anon_select_for_desktop.sql` | **NUEVO.** Política RLS limitada a 48h para que el desktop con anon key pueda leer y actualizar `orders`. | **pendiente**            |
+| Archivo                                  | Qué hace                                                                                                          | ¿Aplicada en producción? |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| `001_initial_schema.sql`                 | Tablas base, RLS inicial, alérgenos UE.                                                                           | sí                       |
+| `002_orders_staff_status.sql`            | Columna `staff_status` global.                                                                                    | sí                       |
+| `003_category_tree.sql`                  | `parent_id` en `categories`.                                                                                      | sí                       |
+| `004_settings.sql`                       | Tabla `settings` con maintenance_enabled.                                                                         | sí                       |
+| `005_pedidos.sql`                        | Tabla `pedidos` (queda renombrada en 009).                                                                        | sí                       |
+| `006_wine_fields.sql`                    | Campos de vino + tabla `product_pairings`.                                                                        | sí                       |
+| `007_per_destination_status.sql`         | **NUEVO.** `staff_status_kitchen` + `_bar` + trigger derivador.                                                   | **pendiente**            |
+| `008_printed_at.sql`                     | **NUEVO.** Columna `printed_at` para anti-duplicación de tickets.                                                 | **pendiente**            |
+| `009_drop_pedidos.sql`                   | **NUEVO.** Renombra `pedidos` → `orders_audit_legacy`.                                                            | **pendiente**            |
+| `010_backfill_destination.sql`           | **NUEVO.** Rellena `items.destination` en pedidos antiguos.                                                       | **pendiente**            |
+| `011_settings_public_read.sql`           | **NUEVO.** Realtime + lectura anon en `settings`.                                                                 | **pendiente**            |
+| `012_orders_anon_select_for_desktop.sql` | **NUEVO.** Política RLS limitada a 48h para que el desktop con anon key pueda leer y actualizar `orders`.         | **pendiente**            |
+| `013_anon_orders_column_lockdown.sql`    | **NUEVO.** Trigger BEFORE UPDATE que rechaza writes anon a columnas distintas de `staff_status_*` / `printed_at`. | **pendiente**            |
 
 ## Despliegue paso a paso
 
