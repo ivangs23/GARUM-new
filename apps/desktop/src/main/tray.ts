@@ -52,6 +52,10 @@ export function updateTrayStatus(status: 'idle' | 'connected' | 'new-order'): vo
 }
 
 function showWindow(win: BrowserWindow): void {
+  // Si la ventana ya fue destruida (poco común — solo si el usuario cerró
+  // con menú "Salir" justo antes), las llamadas .restore/.show/.focus
+  // lanzan "Object has been destroyed". Mejor no hacer nada.
+  if (win.isDestroyed()) return;
   if (win.isMinimized()) win.restore();
   win.show();
   win.focus();

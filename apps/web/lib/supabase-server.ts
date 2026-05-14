@@ -10,9 +10,17 @@ export async function createSupabaseServerClient() {
       cookies: {
         getAll: () => cookieStore.getAll(),
         setAll: (cookiesToSet) => {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
-          )
+          // cookieStore.set lanza si nos llaman desde un Server Component
+          // durante renderizado estático. El proxy ya refresca la sesión
+          // antes de cada request, así que aquí podemos ignorar el error.
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            )
+          } catch {
+            // Se invocó desde un contexto sin escritura de cookies (ej.
+            // un Server Component). El proxy se encarga del refresh.
+          }
         },
       },
     }
