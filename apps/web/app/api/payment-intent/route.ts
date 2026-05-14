@@ -40,6 +40,9 @@ export async function POST(req: Request) {
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: "El carrito está vacío" }, { status: 400 });
     }
+    if (items.length > 50) {
+      return NextResponse.json({ error: "Demasiados ítems en el carrito" }, { status: 400 });
+    }
     for (const item of items) {
       const qty = Number(item.quantity);
       if (!Number.isInteger(qty) || qty < 1 || qty > 99) {
@@ -115,6 +118,14 @@ export async function POST(req: Request) {
         quantity: qty,
         destination: item.destination ?? null,
       });
+    }
+
+    // Cap defensivo: ver /api/checkout para razonamiento.
+    if (totalCents > 1_000_000) {
+      return NextResponse.json({ error: "Importe del pedido fuera de rango" }, { status: 400 });
+    }
+    if (totalCents <= 0) {
+      return NextResponse.json({ error: "Importe del pedido inválido" }, { status: 400 });
     }
 
     // --- Limpia órdenes pending stale (> 15 min) SOLO de esta mesa ---

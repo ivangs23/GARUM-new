@@ -42,6 +42,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "El carrito está vacío" }, { status: 400 });
     }
 
+    // Cap defensivo: una mesa real no encarga >50 líneas distintas. Cualquier
+    // valor mayor casi seguro es un intento de DoS o un cliente roto.
+    if (items.length > 50) {
+      return NextResponse.json({ error: "Demasiados ítems en el carrito" }, { status: 400 });
+    }
+
     for (const item of items) {
       const qty = Number(item.quantity);
       if (!Number.isInteger(qty) || qty < 1 || qty > 99) {
@@ -121,6 +127,15 @@ export async function POST(req: Request) {
       });
     }
 
+    // Cap defensivo: un pedido legítimo no llega a €10.000. Por encima asumimos
+    // manipulación o cliente roto y rechazamos antes de hablar con Stripe.
+    if (totalCents > 1_000_000) {
+      return NextResponse.json({ error: "Importe del pedido fuera de rango" }, { status: 400 });
+    }
+    if (totalCents <= 0) {
+      return NextResponse.json({ error: "Importe del pedido inválido" }, { status: 400 });
+    }
+
     const total = totalCents / 100;
 
     // --- Cleanup stale pending orders (> 15 min) SOLO de esta mesa ---
@@ -160,8 +175,17 @@ export async function POST(req: Request) {
     if (orderError) throw orderError;
 
     // --- Create Stripe Checkout session ---
+    // En producción NEXT_PUBLIC_APP_URL DEBE estar configurada; el fallback a
+    // `origin` o `localhost` solo aplica en dev. Si Stripe usa la URL de éxito
+    // y apunta a localhost desde un entorno de producción se rompe el flujo.
+    const isProd = process.env.NODE_ENV === "production";
     const origin =
-      process.env.NEXT_PUBLIC_APP_URL ?? req.headers.get("origin") ?? "http://localhost:3001";
+      process.env.NEXT_PUBLIC_APP_URL ??
+      (isProd ? null : req.headers.get("origin") ?? "http://localhost:3001");
+    if (!origin) {
+      console.error("Checkout: NEXT_PUBLIC_APP_URL no configurada en producción");
+      return NextResponse.json({ error: "Servicio mal configurado" }, { status: 500 });
+    }
 
     const session = await stripe.checkout.sessions.create({
       line_items: validatedItems.map((item) => ({
