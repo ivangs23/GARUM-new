@@ -11,17 +11,19 @@ export default async function AdminDashboard() {
   const todayStart = new Date();
   todayStart.setUTCHours(0, 0, 0, 0);
 
+  // Las QRs son fijas (1..30) generadas en /admin/qrs sin tabla en DB.
+  // Cuando se mueva a un schema dinámico, sustituir por un count real.
+  const TOTAL_QRS = 30;
+
   const [
     { count: catCount },
     { count: prodCount },
-    { count: qrCount },
     { count: todayOrderCount },
     { data: revenueData },
-    { count: pendingData },
+    { count: pendingOrdersCount },
   ] = await Promise.all([
     supabase.from('categories').select('*', { count: 'exact', head: true }),
     supabase.from('products').select('*', { count: 'exact', head: true }).eq('is_available', true),
-    supabase.from('categories').select('*', { count: 'exact', head: true }),
     supabase.from('orders')
       .select('*', { count: 'exact', head: true })
       .eq('payment_status', 'paid')
@@ -33,17 +35,17 @@ export default async function AdminDashboard() {
     supabase.from('orders')
       .select('*', { count: 'exact', head: true })
       .eq('payment_status', 'paid')
-      .eq('staff_status', 'pending'),
+      .or('staff_status_kitchen.eq.pending,staff_status_bar.eq.pending'),
   ]);
 
   const todayRevenue = (revenueData ?? []).reduce((sum, o) => sum + (o.total_amount ?? 0), 0);
 
   const stats = [
-    { label: 'Pedidos hoy',      value: todayOrderCount ?? 0,        icon: ShoppingBag,    href: '/staff',            sub: `${todayRevenue.toFixed(2)}€ recaudados` },
-    { label: 'Pendientes staff', value: pendingData ?? 0,            icon: TrendingUp,     href: '/staff',            sub: 'en cocina o barra' },
-    { label: 'Productos activos',value: prodCount ?? 0,              icon: UtensilsCrossed, href: '/admin/products',  sub: null },
-    { label: 'Categorías',       value: catCount ?? 0,               icon: Tag,            href: '/admin/categories', sub: null },
-    { label: 'Mesas con QR',     value: qrCount ?? 0,                icon: QrCode,         href: '/admin/qrs',        sub: 'una por categoría' },
+    { label: 'Pedidos hoy',      value: todayOrderCount ?? 0,         icon: ShoppingBag,    href: '/staff',            sub: `${todayRevenue.toFixed(2)}€ recaudados` },
+    { label: 'Pendientes staff', value: pendingOrdersCount ?? 0,      icon: TrendingUp,     href: '/staff',            sub: 'en cocina o barra' },
+    { label: 'Productos activos',value: prodCount ?? 0,               icon: UtensilsCrossed, href: '/admin/products',  sub: null },
+    { label: 'Categorías',       value: catCount ?? 0,                icon: Tag,            href: '/admin/categories', sub: null },
+    { label: 'Mesas con QR',     value: TOTAL_QRS,                    icon: QrCode,         href: '/admin/qrs',        sub: 'mesas configuradas' },
   ];
 
   return (
