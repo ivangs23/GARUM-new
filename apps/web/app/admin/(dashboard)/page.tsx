@@ -11,7 +11,7 @@ export default async function AdminDashboard() {
   const todayStart = new Date();
   todayStart.setUTCHours(0, 0, 0, 0);
 
-  // Las QRs son fijas (1..30) generadas en /admin/qrs sin tabla en DB.
+  // Las QRs son fijas (1..30) generadas en /admin/qr sin tabla en DB.
   // Cuando se mueva a un schema dinámico, sustituir por un count real.
   const TOTAL_QRS = 30;
 
@@ -45,7 +45,7 @@ export default async function AdminDashboard() {
     { label: 'Pendientes staff', value: pendingOrdersCount ?? 0,      icon: TrendingUp,     href: '/staff',            sub: 'en cocina o barra' },
     { label: 'Productos activos',value: prodCount ?? 0,               icon: UtensilsCrossed, href: '/admin/products',  sub: null },
     { label: 'Categorías',       value: catCount ?? 0,                icon: Tag,            href: '/admin/categories', sub: null },
-    { label: 'Mesas con QR',     value: TOTAL_QRS,                    icon: QrCode,         href: '/admin/qrs',        sub: 'mesas configuradas' },
+    { label: 'Mesas con QR',     value: TOTAL_QRS,                    icon: QrCode,         href: '/admin/qr',         sub: 'mesas configuradas' },
   ];
 
   return (
