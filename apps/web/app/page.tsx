@@ -2,6 +2,7 @@
 
 import { Wine, Coffee, Utensils } from "lucide-react";
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRef } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -30,7 +31,14 @@ export default function Home() {
 
 <header className="header">
         <div className="logo-wrap" onClick={handleLogoClick} style={{ cursor: 'default' }}>
-          <img src="/Logo%20garum.png" alt="Garum Vinoteca" className="brand-logo" />
+          <Image
+            src="/Logo%20garum.png"
+            alt="Garum Vinoteca"
+            className="brand-logo"
+            width={220}
+            height={220}
+            priority
+          />
         </div>
         <div className="divider" />
       </header>

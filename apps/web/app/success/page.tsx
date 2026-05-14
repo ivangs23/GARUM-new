@@ -2,6 +2,7 @@
 
 import { CheckCircle, ArrowLeft, UtensilsCrossed } from "lucide-react";
 import Link from 'next/link';
+import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { useCart } from "@/context/CartContext";
@@ -39,7 +40,14 @@ function SuccessContent() {
 
   return (
     <div className="card">
-      <img src="/Logo%20garum.png" alt="Garum Vinoteca" className="logo" />
+      <Image
+        src="/Logo%20garum.png"
+        alt="Garum Vinoteca"
+        className="logo"
+        width={120}
+        height={120}
+        priority
+      />
 
       <div className="check-wrap">
         <CheckCircle size={52} color="#7B4F96" />

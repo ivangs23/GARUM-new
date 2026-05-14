@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase-browser';
 import { Lock, Mail, Loader2 } from 'lucide-react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 
 export default function StaffLoginPage() {
@@ -25,7 +26,14 @@ export default function StaffLoginPage() {
     <div className="login-container">
       <div className="login-card glass">
         <div className="login-header">
-          <img src="/Logo%20garum.png" alt="Garum Vinoteca" className="login-logo" />
+          <Image
+            src="/Logo%20garum.png"
+            alt="Garum Vinoteca"
+            className="login-logo"
+            width={120}
+            height={120}
+            priority
+          />
           <p>Panel de Staff</p>
         </div>
         <form onSubmit={handleLogin} className="login-form">

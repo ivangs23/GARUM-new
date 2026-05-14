@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase-browser';
 import { Lock, Mail, Loader2, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 
 export default function AdminLoginPage() {
@@ -38,7 +39,14 @@ export default function AdminLoginPage() {
 
       <div className="login-card">
         <div className="login-header">
-          <img src="/Logo%20garum.png" alt="Garum Vinoteca" className="login-logo" />
+          <Image
+            src="/Logo%20garum.png"
+            alt="Garum Vinoteca"
+            className="login-logo"
+            width={120}
+            height={120}
+            priority
+          />
           <p className="subtitle serif">Panel de Administración</p>
         </div>
 

@@ -683,7 +683,14 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
     return (
       <div className="error-screen" role="alert">
         <div className="error-card">
-          <img src="/Logo%20garum.png" alt="Garum Vinoteca" className="error-logo" />
+          <Image
+            src="/Logo%20garum.png"
+            alt="Garum Vinoteca"
+            className="error-logo"
+            width={160}
+            height={160}
+            priority
+          />
           <h2 className="serif">{t("menu.errorTitle")}</h2>
           <p>{loadError}</p>
           <button type="button" className="gold-button" onClick={() => window.location.reload()}>
@@ -734,7 +741,14 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
     return (
       <div className="maintenance-screen">
         <div className="maintenance-card">
-          <img src="/Logo%20garum.png" alt="Garum Vinoteca" className="maintenance-logo" />
+          <Image
+            src="/Logo%20garum.png"
+            alt="Garum Vinoteca"
+            className="maintenance-logo"
+            width={160}
+            height={160}
+            priority
+          />
           <div className="maintenance-icon">🔧</div>
           <h1 className="serif">Fuera de servicio</h1>
           <p className="maintenance-msg">{maintenance.message}</p>
@@ -808,7 +822,14 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
             style={{ textDecoration: "none" }}
             aria-label="Garum Vinoteca — inicio"
           >
-            <img src="/Logo%20garum.png" alt="Garum Vinoteca" className="nav-logo-img" />
+            <Image
+              src="/Logo%20garum.png"
+              alt="Garum Vinoteca"
+              className="nav-logo-img"
+              width={48}
+              height={48}
+              priority
+            />
           </Link>
           <div className="navbar-right">
             <span className="table-badge" aria-label={`${t("menu.tableLabel")} ${mesa}`}>

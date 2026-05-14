@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { supabaseBrowser as supabase } from "@/lib/supabase-browser";
 import { Printer, ChefHat, Wine, LogOut, CheckCircle, Clock } from "lucide-react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { filterItems, hasItemsFor, type Destination, type RoutableItem } from "@garum/shared/order-routing";
 
@@ -262,7 +263,14 @@ export default function StaffPage() {
     <main className="staff-container">
       <header className="staff-header glass">
         <div className="header-left">
-          <img src="/Logo%20garum.png" alt="Garum Vinoteca" className="staff-logo" />
+          <Image
+            src="/Logo%20garum.png"
+            alt="Garum Vinoteca"
+            className="staff-logo"
+            width={48}
+            height={48}
+            priority
+          />
           <span className="header-sub">Panel de Comandas</span>
         </div>
         <div className="header-right">

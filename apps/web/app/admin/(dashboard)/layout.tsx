@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { Menu } from 'lucide-react';
 import AdminNav from './AdminNav';
 import '../admin.css';
@@ -15,7 +16,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <button className="admin-hamburger" onClick={() => setOpen(true)} aria-label="Abrir menú">
           <Menu size={22} />
         </button>
-        <img src="/Logo%20garum.png" alt="Garum Vinoteca" className="admin-topbar-logo" />
+        <Image
+          src="/Logo%20garum.png"
+          alt="Garum Vinoteca"
+          className="admin-topbar-logo"
+          width={40}
+          height={40}
+          priority
+        />
         <div style={{ width: 40 }} />
       </div>
 

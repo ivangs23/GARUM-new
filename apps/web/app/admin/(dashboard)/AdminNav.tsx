@@ -1,6 +1,7 @@
 "use client";
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, Tag, UtensilsCrossed, QrCode, LogOut, ArrowLeft, X, Settings } from 'lucide-react';
 import { supabaseBrowser } from '@/lib/supabase-browser';
@@ -33,7 +34,14 @@ export default function AdminNav({ open, onClose }: AdminNavProps) {
       </button>
 
       <div className="nav-logo">
-        <img src="/Logo%20garum.png" alt="Garum Vinoteca" className="nav-logo-img" />
+        <Image
+          src="/Logo%20garum.png"
+          alt="Garum Vinoteca"
+          className="nav-logo-img"
+          width={48}
+          height={48}
+          priority
+        />
         <small>Admin</small>
       </div>
 
