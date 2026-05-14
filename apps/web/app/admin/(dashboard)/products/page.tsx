@@ -6,10 +6,25 @@ import ProductsList, { type Product } from "./ProductsList";
 export default async function ProductsPage() {
   const supabase = await createSupabaseServerClient();
 
-  const [{ data: products }, { data: categories }] = await Promise.all([
+  const [productsRes, categoriesRes] = await Promise.all([
     supabase.from("products").select("*, categories(name)").order("sort_order"),
     supabase.from("categories").select("id, name, parent_id").order("sort_order"),
   ]);
+
+  if (productsRes.error || categoriesRes.error) {
+    console.error("[admin/products] query failed:", productsRes.error ?? categoriesRes.error);
+    return (
+      <div className="products-page">
+        <h1 className="admin-page-title">Productos</h1>
+        <p className="error-msg">
+          No se pudieron cargar los productos. Revisa la conexión y recarga la página.
+        </p>
+      </div>
+    );
+  }
+
+  const products = productsRes.data;
+  const categories = categoriesRes.data;
 
   return (
     <div className="products-page">

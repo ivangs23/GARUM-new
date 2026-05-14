@@ -38,8 +38,17 @@ export default function ProductForm({ initial, categories, onSuccess, onCancel }
   const [allergens, setAllergens] = useState<AllergenRow[]>([]);
 
   useEffect(() => {
+    let cancelled = false;
     supabase.from('allergens').select('id, name, icon').order('id')
-      .then(({ data }) => { if (data) setAllergens(data); });
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) {
+          console.error('[ProductForm] allergens fetch failed:', error);
+          return;
+        }
+        if (data) setAllergens(data);
+      });
+    return () => { cancelled = true; };
   }, []);
 
   const [form, setForm] = useState<ProductData>(initial ?? {
@@ -121,12 +130,25 @@ export default function ProductForm({ initial, categories, onSuccess, onCancel }
       productId = data.id;
     }
 
-    // Sync extras
-    await supabase.from('product_extras').delete().eq('product_id', productId!);
+    // Sync extras: borra los actuales y reinserta. Hacemos check de error en
+    // ambos pasos porque si delete falla y luego insertamos, el producto
+    // acaba con duplicados; si insert falla y no avisamos, el producto queda
+    // sin extras y el usuario cree que se guardó OK.
+    const delRes = await supabase.from('product_extras').delete().eq('product_id', productId!);
+    if (delRes.error) {
+      setError(`No se pudieron limpiar los extras: ${delRes.error.message}`);
+      setLoading(false);
+      return;
+    }
     if (extras.length > 0) {
-      await supabase.from('product_extras').insert(
+      const insRes = await supabase.from('product_extras').insert(
         extras.filter(ex => ex.name).map(ex => ({ product_id: productId!, name: ex.name, price: ex.price }))
       );
+      if (insRes.error) {
+        setError(`No se pudieron guardar los extras: ${insRes.error.message}`);
+        setLoading(false);
+        return;
+      }
     }
 
     if (onSuccess) { onSuccess(); } else { router.push('/admin/products'); router.refresh(); }
