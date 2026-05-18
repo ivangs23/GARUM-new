@@ -98,15 +98,38 @@ function makeICO(pngBuf) {
   return Buffer.concat([header, dirEntry, pngBuf]);
 }
 
-// ── Icono principal (256×256) ─────────────────────────────────────────────────
+// ── Generador de ICNS (Mac) ───────────────────────────────────────────────────
+
+function makeICNS(...entries) {
+  // entries: [{ type: '4-char', png: Buffer }]
+  const blocks = entries.map(({ type, png }) => {
+    const typeBuf = Buffer.from(type, 'ascii');
+    const sizeBuf = Buffer.alloc(4);
+    sizeBuf.writeUInt32BE(png.length + 8);
+    return Buffer.concat([typeBuf, sizeBuf, png]);
+  });
+  const body     = Buffer.concat(blocks);
+  const magic    = Buffer.from('icns', 'ascii');
+  const totalBuf = Buffer.alloc(4);
+  totalBuf.writeUInt32BE(8 + body.length);
+  return Buffer.concat([magic, totalBuf, body]);
+}
+
+// ── Icono principal ───────────────────────────────────────────────────────────
 
 const PURPLE = [123, 79, 150]; // --primary de la paleta Garum
 
 const icon256 = makePNG(256, 256, ...PURPLE);
-const iconIco = makeICO(icon256);
+const icon512 = makePNG(512, 512, ...PURPLE);
+const iconIco  = makeICO(icon256);
+const iconIcns = makeICNS(
+  { type: 'ic08', png: icon256 }, // 256×256
+  { type: 'ic09', png: icon512 }, // 512×512
+);
 
-save('icon.png', icon256);
-save('icon.ico', iconIco);
+save('icon.png',  icon512); // ≥512 px recomendado para Mac
+save('icon.ico',  iconIco);
+save('icon.icns', iconIcns);
 
 // ── Iconos de bandeja (16×16) ─────────────────────────────────────────────────
 

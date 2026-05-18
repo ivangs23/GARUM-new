@@ -34,6 +34,8 @@ let savedWin: BrowserWindow | null = null;
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
 let midnightTimer: ReturnType<typeof setTimeout> | null = null;
 let retryDelay = 5000; // ms — se duplica en cada fallo, máx 60 s
+let retryCount = 0;
+const MAX_RETRIES = 10; // tras 10 intentos fallidos deja de reconectar
 
 let currentStatus: ConnectionStatus = 'connecting';
 let currentMaintenance: MaintenanceState = { enabled: false, message: '' };
@@ -76,7 +78,28 @@ export async function startRealtimeListener(
   // conexiones que se caen sin que la subscribe callback lo señale.
   supabase.realtime.onHeartbeat((status, latency) => {
     diag('heartbeat:', status, latency != null ? `${latency}ms` : '');
+    if (status === 'timeout') {
+      diag('heartbeat timeout — forzando reconexión');
+      scheduleReconnect();
+    }
   });
+
+  // ── Autenticación con cuenta de servicio (si está configurada) ────────────
+  const desktopEmail    = process.env.VITE_DESKTOP_EMAIL;
+  const desktopPassword = process.env.VITE_DESKTOP_PASSWORD;
+  if (desktopEmail && desktopPassword) {
+    const { error: authErr } = await supabase.auth.signInWithPassword({
+      email: desktopEmail,
+      password: desktopPassword,
+    });
+    if (authErr) {
+      diag('signIn error (usando anon como fallback):', authErr.message);
+    } else {
+      diag('autenticado como cuenta de servicio del desktop');
+    }
+  } else {
+    diag('VITE_DESKTOP_EMAIL no configurado — usando anon key');
+  }
 
   sendStatus(win, 'connecting');
 
@@ -100,6 +123,7 @@ export async function startRealtimeListener(
       diag('subscribe[orders] callback: status=', status, 'err=', err?.message ?? 'null');
       if (status === 'SUBSCRIBED') {
         retryDelay = 5000;
+        retryCount = 0;
         sendStatus(win, 'connected');
         scheduleMidnightRollover(win);
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
@@ -243,9 +267,13 @@ async function reprintMissed(list: Order[]): Promise<void> {
     try {
       await printOrder(order, printers);
     } catch (e) {
-      console.error('[Realtime] reprint failed:', e);
-      // Liberar el slot para reintentar luego.
+      diag('[Realtime] reprint failed:', e);
       await supabase.from('orders').update({ printed_at: null }).eq('id', order.id);
+      savedWin?.webContents.send(IPC.PRINT_ERROR, {
+        orderId: order.id,
+        mesa: order.table_number,
+        reason: e instanceof Error ? e.message : String(e),
+      });
     }
   }
 }
@@ -274,7 +302,13 @@ async function loadMaintenance(win: BrowserWindow): Promise<void> {
 
 function scheduleReconnect(): void {
   if (retryTimer || !savedUrl || !savedWin) return;
-  console.log(`[Realtime] Reintentando conexión en ${retryDelay / 1000}s…`);
+  if (retryCount >= MAX_RETRIES) {
+    diag('[Realtime] Máximo de reintentos alcanzado. Conexión abandonada.');
+    sendStatus(savedWin, 'disconnected');
+    return;
+  }
+  retryCount++;
+  diag(`[Realtime] Reintento ${retryCount}/${MAX_RETRIES} en ${retryDelay / 1000}s…`);
   retryTimer = setTimeout(async () => {
     retryTimer = null;
     if (!savedWin || savedWin.isDestroyed() || !savedUrl) return;
@@ -287,6 +321,7 @@ function scheduleReconnect(): void {
 function cancelReconnect(): void {
   if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
   retryDelay = 5000;
+  retryCount = 0;
 }
 
 // ─── Cambios en tiempo real ───────────────────────────────────────────────────
@@ -354,9 +389,14 @@ async function reservePrintAndDispatch(order: Order): Promise<void> {
   try {
     await printOrder(order, printers);
   } catch (err) {
-    console.error('[Realtime] Error al imprimir:', err);
+    diag('[Realtime] Error al imprimir:', err);
     // Liberar la reserva para reintentar en el próximo arranque.
     await supabase.from('orders').update({ printed_at: null }).eq('id', order.id);
+    savedWin?.webContents.send(IPC.PRINT_ERROR, {
+      orderId: order.id,
+      mesa: order.table_number,
+      reason: err instanceof Error ? err.message : String(err),
+    });
   }
 }
 
@@ -392,9 +432,9 @@ export function getOrders(): Order[] {
 function scheduleMidnightRollover(win: BrowserWindow): void {
   if (midnightTimer) clearTimeout(midnightTimer);
   const ms = msUntilNextMidnightMadrid();
-  console.log('[Realtime] Próximo cambio de día en', Math.round(ms / 60000), 'min');
+  diag('[Realtime] Próximo cambio de día en', Math.round(ms / 60000), 'min');
   midnightTimer = setTimeout(async () => {
-    console.log('[Realtime] Cambio de día — refrescando cache');
+    diag('[Realtime] Cambio de día — refrescando cache');
     if (!supabase || !savedWin || savedWin.isDestroyed()) return;
     await loadInitialOrders(savedWin);
     scheduleMidnightRollover(win);

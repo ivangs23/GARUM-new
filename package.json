@@ -12,6 +12,9 @@
     "web:dev": "pnpm --filter web dev",
     "web:build": "pnpm --filter web build",
     "desktop:dev": "pnpm --filter garum-desktop dev",
+    "desktop:dist:win": "pnpm --filter garum-desktop dist:win",
+    "desktop:dist:mac": "pnpm --filter garum-desktop dist:mac",
+    "desktop:dist": "pnpm --filter garum-desktop dist",
     "prepare": "husky"
   },
   "devDependencies": {
@@ -34,5 +37,13 @@
   "engines": {
     "node": ">=20",
     "pnpm": ">=9"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "esbuild",
+      "sharp",
+      "unrs-resolver"
+    ]
   }
 }

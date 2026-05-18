@@ -1,4 +1,5 @@
 import { app, BrowserWindow } from 'electron';
+import { autoUpdater }        from 'electron-updater';
 import { createMainWindow }   from './window';
 import { createTray }         from './tray';
 import { setupIpc }           from './ipc';
@@ -49,6 +50,18 @@ app.whenReady().then(async () => {
   // marca 'disconnected' por sí mismo para que la UI no se quede en "Conectando".
   if (!isE2E) {
     await startRealtimeListener(config.supabaseUrl, config.supabaseKey, mainWindow);
+  }
+
+  // Auto-update: comprobar GitHub Releases al arrancar (omitir en E2E y dev)
+  if (!isE2E && app.isPackaged) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    autoUpdater.logger = { info: (m: unknown) => diag('[updater]', m), warn: (m: unknown) => diag('[updater] WARN', m), error: (m: unknown) => diag('[updater] ERROR', m), debug: (_m: unknown) => {} } as any;
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.on('update-available',   (info) => diag('[updater] update available:', info.version));
+    autoUpdater.on('update-downloaded',  (info) => diag('[updater] update downloaded — se instalará al cerrar:', info.version));
+    autoUpdater.on('error',              (err)  => diag('[updater] error:', err.message));
+    autoUpdater.checkForUpdates().catch((err) => diag('[updater] checkForUpdates error:', err.message));
   }
 });
 

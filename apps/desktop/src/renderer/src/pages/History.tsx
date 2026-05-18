@@ -107,20 +107,36 @@ export default function History() {
         </div>
       )}
 
-      {dayKeys.map(k => (
-        <section key={k} style={{ marginBottom: '1.5rem' }}>
-          <h3 style={{
-            fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.1em',
-            color: 'var(--muted)', marginBottom: '0.6rem', borderBottom: '1px solid var(--border)',
-            paddingBottom: '0.3rem',
-          }}>
-            {dayLabel(grouped[k][0].created_at)}
-          </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            {grouped[k].map(o => <HistoryCard key={o.id} order={o} />)}
-          </div>
-        </section>
-      ))}
+      {dayKeys.map(k => {
+        const dayOrders = grouped[k];
+        const paidOrders = dayOrders.filter(o => o.payment_status === 'paid');
+        const dayTotal = paidOrders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
+        const paidCount = paidOrders.length;
+        const cancelledCount = dayOrders.length - paidCount;
+        return (
+          <section key={k} style={{ marginBottom: '1.5rem' }}>
+            <div style={{
+              display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+              borderBottom: '1px solid var(--border)', paddingBottom: '0.3rem', marginBottom: '0.6rem',
+            }}>
+              <h3 style={{
+                fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.1em',
+                color: 'var(--muted)', margin: 0,
+              }}>
+                {dayLabel(dayOrders[0].created_at)}
+              </h3>
+              <span style={{ fontFamily: 'monospace', fontSize: '0.82rem', fontWeight: 700, color: 'var(--primary)' }}>
+                {paidCount} pedido{paidCount !== 1 ? 's' : ''}
+                {cancelledCount > 0 ? ` · ${cancelledCount} cancelado${cancelledCount !== 1 ? 's' : ''}` : ''}
+                {' · '}{dayTotal.toFixed(2)} €
+              </span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {dayOrders.map(o => <HistoryCard key={o.id} order={o} />)}
+            </div>
+          </section>
+        );
+      })}
 
       <div ref={sentinelRef} style={{ height: 1 }} />
 

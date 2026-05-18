@@ -31,66 +31,53 @@ type PaidOrder = {
   total_amount: number | null;
 };
 
-async function markPaid(orderId: string, stripeRef: string) {
-  // 1) intento normal: pending → paid
-  const { data: paidRows, error: paidErr } = await supabaseAdmin
-    .from("orders")
-    .update({ payment_status: "paid" })
-    .eq("id", orderId)
-    .eq("payment_status", "pending")
-    .select("id, table_number, total_amount");
-
-  if (paidErr) {
-    console.error("Error actualizando pedido (pending→paid):", paidErr);
-    return { ok: false as const };
-  }
-  if (paidRows && paidRows.length > 0) {
-    return {
-      ok: true as const,
-      order: paidRows[0] as PaidOrder,
-      reactivated: false,
-    };
-  }
-
-  // 2) ¿estaba como cancelled por el cleanup de stale orders?
-  const { data: existing } = await supabaseAdmin
+async function markPaid(orderId: string, stripeRef: string, stripeAmountCents: number) {
+  // 1) Leer estado actual para verificar importe antes de actualizar
+  const { data: current } = await supabaseAdmin
     .from("orders")
     .select("id, payment_status, table_number, total_amount")
     .eq("id", orderId)
     .maybeSingle();
 
-  if (!existing) {
-    console.warn(`Webhook: pedido ${orderId} no existe (Stripe ref=${stripeRef}).`);
+  if (!current) {
+    console.warn(`Webhook: pedido ${orderId} no existe (ref=${stripeRef}).`);
     return { ok: true as const, order: null };
   }
 
-  if (existing.payment_status === "paid") {
-    // Ya estaba pagado (reintento de Stripe). Idempotente, no hacemos nada.
-    console.log(`Webhook: pedido ${orderId} ya estaba paid, idempotente.`);
-    return { ok: true as const, order: null };
-  }
-
-  if (existing.payment_status === "cancelled") {
-    console.warn(
-      `⚠ Webhook: reactivando pedido ${orderId} cancelado (cleanup llegó antes que Stripe). ref=${stripeRef}`
+  // Verificar que el importe cobrado por Stripe coincide con el de la BD.
+  // Tolerancia de 1 céntimo por redondeo de floats.
+  const expectedCents = Math.round((current.total_amount ?? 0) * 100);
+  if (Math.abs(stripeAmountCents - expectedCents) > 1) {
+    console.error(
+      `Webhook: importe no coincide — Stripe=${stripeAmountCents}c DB=${expectedCents}c order=${orderId}. Rechazado.`
     );
-    const { data: reactivated, error: reErr } = await supabaseAdmin
-      .from("orders")
-      .update({ payment_status: "paid" })
-      .eq("id", orderId)
-      .eq("payment_status", "cancelled")
-      .select("id, table_number, total_amount");
-    if (reErr) {
-      console.error("Error reactivando pedido cancelled→paid:", reErr);
-      return { ok: false as const };
-    }
-    if (reactivated && reactivated.length > 0) {
-      return {
-        ok: true as const,
-        order: reactivated[0] as PaidOrder,
-        reactivated: true,
-      };
-    }
+    return { ok: false as const };
+  }
+
+  if (current.payment_status === "paid") {
+    return { ok: true as const, order: null }; // idempotente
+  }
+
+  // 2) UPDATE atómico — acepta pending o cancelled (cleanup llegó antes que Stripe)
+  const reactivating = current.payment_status === "cancelled";
+  if (reactivating) {
+    console.warn(`⚠ Webhook: reactivando pedido ${orderId} cancelado (ref=${stripeRef}).`);
+  }
+
+  const { data: updated, error } = await supabaseAdmin
+    .from("orders")
+    .update({ payment_status: "paid" })
+    .eq("id", orderId)
+    .in("payment_status", ["pending", "cancelled"])
+    .select("id, table_number, total_amount");
+
+  if (error) {
+    console.error("Error actualizando pedido:", error);
+    return { ok: false as const };
+  }
+
+  if (updated && updated.length > 0) {
+    return { ok: true as const, order: updated[0] as PaidOrder, reactivated: reactivating };
   }
 
   return { ok: true as const, order: null };
@@ -123,13 +110,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing order id" }, { status: 400 });
     }
 
-    const result = await markPaid(orderId, intent.id);
+    const result = await markPaid(orderId, intent.id, intent.amount_received);
     if (!result.ok) return NextResponse.json({ error: "DB Update Failed" }, { status: 500 });
-    if (result.order) {
-      console.log(
-        `✅ Pedido ${orderId} ${result.reactivated ? "REACTIVADO" : "marcado"} como pagado (PaymentIntent).`
-      );
-    }
     return NextResponse.json({ received: true });
   }
 
@@ -144,13 +126,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing order id" }, { status: 400 });
     }
 
-    const result = await markPaid(orderId, sessionId);
+    const result = await markPaid(orderId, sessionId, session.amount_total ?? 0);
     if (!result.ok) return NextResponse.json({ error: "DB Update Failed" }, { status: 500 });
-    if (result.order) {
-      console.log(
-        `✅ Pedido ${orderId} ${result.reactivated ? "REACTIVADO" : "marcado"} como pagado (Checkout Session).`
-      );
-    }
     return NextResponse.json({ received: true });
   }
 

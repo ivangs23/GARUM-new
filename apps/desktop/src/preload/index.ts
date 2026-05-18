@@ -52,6 +52,9 @@ const api = {
   onMaintenanceChanged: (cb: (state: MaintenanceState) => void) =>
     ipcRenderer.on(IPC.MAINTENANCE_CHANGED, (_e, v) => cb(v)),
 
+  onPrintError: (cb: (err: { orderId: string; mesa: number; reason: string }) => void) =>
+    ipcRenderer.on(IPC.PRINT_ERROR, (_e, v) => cb(v)),
+
   off: (channel: string) =>
     ipcRenderer.removeAllListeners(channel),
 

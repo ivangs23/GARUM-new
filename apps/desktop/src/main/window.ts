@@ -1,6 +1,7 @@
 import { app, BrowserWindow, shell } from 'electron';
 import { join } from 'path';
 import { is } from '@electron-toolkit/utils';
+import { diag } from './diag';
 
 // Cuando el usuario cierra la ventana queremos esconder a bandeja, pero cuando
 // el SO/electron-vite manda SIGTERM tenemos que dejar que el quit complete:
@@ -18,17 +19,43 @@ export function createMainWindow(): BrowserWindow {
     title:     'Garum — Panel de Comandas',
     icon:      join(__dirname, '../../resources/icon.png'),
     show:      false,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: '#f4f4f5',
     webPreferences: {
       preload:          join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       sandbox:          true,
       nodeIntegration:  false,
+      devTools:         !app.isPackaged,
     },
   });
 
   // Mostrar cuando esté lista (evita flash blanco)
-  win.on('ready-to-show', () => win.show());
+  win.on('ready-to-show', () => {
+    diag('window: ready-to-show → win.show()');
+    win.show();
+  });
+
+  win.webContents.on('did-finish-load', () => {
+    diag('window: did-finish-load');
+    if (!win.isVisible()) win.show();
+  });
+
+  win.webContents.on('did-fail-load', (_e, code, desc, url) => {
+    diag('window: did-fail-load', code, desc, url);
+    win.show(); // mostrar aunque sea con error
+  });
+
+  win.webContents.on('render-process-gone', (_e, details) => {
+    diag('window: render-process-gone', JSON.stringify(details));
+  });
+
+  // Fallback: si en 10 s la ventana sigue oculta, mostrarla de todas formas
+  setTimeout(() => {
+    if (!win.isDestroyed() && !win.isVisible()) {
+      diag('window: fallback show after 10s timeout');
+      win.show();
+    }
+  }, 10_000);
 
   // Cerrar = minimizar a bandeja (no salir), salvo que estemos saliendo de verdad.
   win.on('close', e => {

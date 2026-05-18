@@ -5,6 +5,7 @@ import {
   hasItemsFor,
   type Destination,
 } from '@garum/shared/order-routing';
+import { isToday } from '@garum/shared/format';
 import { PreviewModal } from '../components/PreviewModal';
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────
@@ -45,8 +46,8 @@ function OrderCard({ order, dest, onDone, onPreview }: {
     <div
       data-done={isDone ? 'true' : 'false'}
       style={{
-        background: isDone ? '#0e0e0e' : isUrgent ? '#1a0f0f' : 'var(--surface)',
-        border: `1px solid ${isDone ? 'var(--border)' : isUrgent ? 'rgba(239,68,68,.5)' : 'var(--border)'}`,
+        background: isDone ? '#f0f0f2' : isUrgent ? '#fff5f5' : 'var(--surface)',
+        border: `1px solid ${isDone ? 'var(--border)' : isUrgent ? 'rgba(220,38,38,.3)' : 'var(--border)'}`,
         borderRadius: 14, padding: '1rem', display: 'flex', flexDirection: 'column',
         gap: '0.75rem', animation: 'slideIn 0.25s ease',
         opacity: isDone ? 0.5 : 1,
@@ -88,8 +89,8 @@ function OrderCard({ order, dest, onDone, onPreview }: {
           style={{
             padding: '6px 12px',
             background: 'transparent',
-            color: '#aaa',
-            border: '1px solid #333',
+            color: 'var(--muted)',
+            border: '1px solid var(--border)',
             borderRadius: 4,
             cursor: 'pointer',
             fontSize: 13,
@@ -223,13 +224,16 @@ export default function Orders() {
       if (fresh) audioRef.current?.play().catch(() => {});
     });
     window.api.onOrderRemoved(remove);
+    window.api.onPrintError(({ mesa, reason }) => {
+      setError(`Error de impresora — Mesa ${mesa}: ${reason}`);
+      setTimeout(() => setError(null), 8000);
+    });
 
     return () => {
-      // Usar la enum IPC evita drift entre suscripción y cleanup si los
-      // literales del canal cambian en shared/types.ts.
       window.api.off(IPC.ORDERS_INIT);
       window.api.off(IPC.ORDERS_NEW);
       window.api.off(IPC.ORDERS_REMOVED);
+      window.api.off(IPC.PRINT_ERROR);
       audioRef.current = null;
     };
   }, [upsert, remove]);
@@ -263,9 +267,13 @@ export default function Orders() {
     }
   };
 
-  const total = orders.filter(o =>
+  const pending = orders.filter(o =>
     o.staff_status_kitchen === 'pending' || o.staff_status_bar === 'pending'
   ).length;
+
+  const todayPaid = orders.filter(o => o.payment_status === 'paid' && isToday(o.created_at));
+  const dailyTotal = todayPaid.reduce((sum, o) => sum + (o.total_amount || 0), 0);
+  const dailyCount = todayPaid.length;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -276,7 +284,22 @@ export default function Orders() {
       }}>
         <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Pedidos activos</span>
         <span style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>
-          {total === 0 ? 'Todo listo ✓' : `${total} mesa${total > 1 ? 's' : ''} pendiente${total > 1 ? 's' : ''}`}
+          {pending === 0 ? 'Todo listo ✓' : `${pending} mesa${pending > 1 ? 's' : ''} pendiente${pending > 1 ? 's' : ''}`}
+        </span>
+      </div>
+
+      {/* Caja del día */}
+      <div style={{
+        padding: '0.55rem 1.5rem',
+        borderBottom: '1px solid var(--border)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        background: 'rgba(123,79,150,0.06)',
+      }}>
+        <span style={{ fontSize: '0.78rem', color: 'var(--muted)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+          Caja hoy
+        </span>
+        <span style={{ fontSize: '0.85rem', fontWeight: 700, fontFamily: 'monospace', color: 'var(--primary)' }}>
+          {dailyCount} pedido{dailyCount !== 1 ? 's' : ''} · {dailyTotal.toFixed(2)} €
         </span>
       </div>
 

@@ -2,14 +2,17 @@
   "name": "garum-desktop",
   "version": "1.0.0",
   "description": "Panel de comandas y gestión de impresoras — Garum Vinoteca",
+  "author": "Garum Vinoteca",
   "main": "out/main/index.js",
   "scripts": {
-    "dev": "ELECTRON_RUN_AS_NODE= electron-vite dev",
+    "dev": "electron-vite dev",
     "build": "electron-vite build",
     "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.web.json --noEmit",
     "test": "npm run test:unit",
     "gen-icons": "node scripts/gen-icons.cjs",
     "dist:win": "npm run gen-icons && npm run build && electron-builder --win",
+    "dist:mac": "npm run gen-icons && npm run build && electron-builder --mac",
+    "dist": "npm run gen-icons && npm run build && electron-builder",
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
     "pretest:e2e": "npm run build",
@@ -20,12 +23,14 @@
     "appId": "com.garum.desktop",
     "productName": "Garum Desktop",
     "copyright": "Garum Vinoteca",
+    "electronVersion": "33.4.11",
+    "electronDist": "../../node_modules/electron/dist",
     "directories": {
       "buildResources": "resources",
-      "output": "release"
+      "output": "dist-out"
     },
     "files": [
-      "dist/**/*"
+      "out/**/*"
     ],
     "extraResources": [
       {
@@ -48,18 +53,34 @@
       ],
       "icon": "resources/icon.ico"
     },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "resources/icon.icns"
+    },
     "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "runAfterFinish": true,
-      "shortcutName": "Garum Desktop"
+      "oneClick": true,
+      "perMachine": false,
+      "runAfterFinish": true
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "ivangs23",
+      "repo": "GARUM-new",
+      "releaseType": "release"
     }
   },
   "dependencies": {
     "@garum/shared": "workspace:*",
     "@supabase/supabase-js": "^2.105.4",
+    "electron-updater": "^6.8.3",
     "node-thermal-printer": "^4.6.0",
     "ws": "^8.20.1"
   },
@@ -72,7 +93,8 @@
     "@types/react-dom": "^19.2.3",
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^4.7.0",
-    "electron": "^33.4.11",
+    "cross-env": "^10.1.0",
+    "electron": "33.4.11",
     "electron-builder": "^25.1.8",
     "electron-vite": "^2.3.0",
     "playwright": "^1.60.0",

@@ -75,13 +75,13 @@ export function setupIpc(win: BrowserWindow): void {
   ipcMain.handle(IPC.PRINTERS_TEST, async (_e, printerConfig: PrinterConfig) => {
     const testOrder: Order = {
       id: 'test-00000000',
-      table_number: 0,
-      items: [{ id: 'test', name: 'Ticket de prueba OK', price: 0, quantity: 1 }],
+      table_number: 99,
+      items: [{ id: 'test', name: 'Ticket de prueba', price: 0, quantity: 1 }],
       total_amount: 0,
       payment_status: 'paid',
       staff_status: 'pending',
       staff_status_kitchen: 'pending',
-      staff_status_bar: 'na',
+      staff_status_bar: 'pending',
       printed_at: null,
       created_at: new Date().toISOString(),
     };

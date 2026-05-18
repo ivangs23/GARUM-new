@@ -23,6 +23,7 @@ declare global {
       onOrderRemoved:       (cb: (id: string) => void)  => void;
       onConnectionStatus:   (cb: (s: string) => void)   => void;
       onMaintenanceChanged: (cb: (m: MaintenanceState) => void) => void;
+      onPrintError:         (cb: (err: { orderId: string; mesa: number; reason: string }) => void) => void;
       off:                  (channel: string)           => void;
       listWindowsPrinters:  ()                          => Promise<DiscoveredPrinter[]>;
       scanNetworkPrinters:  ()                          => Promise<DiscoveredPrinter[]>;

@@ -83,4 +83,5 @@ export const IPC = {
   CONNECTION_GET:          'connection:get',
   MAINTENANCE_GET:         'maintenance:get',
   MAINTENANCE_CHANGED:     'maintenance:changed',
+  PRINT_ERROR:             'print:error',
 } as const;

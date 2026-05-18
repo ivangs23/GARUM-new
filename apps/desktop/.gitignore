@@ -1,5 +1,20 @@
 node_modules/
-dist/
+
+# electron-vite compile output
+out/
+
+# electron-builder package output
+dist-out/
+dist-release/
 release/
+
+# Env
 .env
+.env.local
 *.local
+
+# Generated macOS icon (Windows-only project; .ico y .png sí se commitean)
+resources/icon.icns
+
+# Misc
+*.tsbuildinfo
