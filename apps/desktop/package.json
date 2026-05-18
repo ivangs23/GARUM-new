@@ -24,7 +24,6 @@
     "productName": "Garum Desktop",
     "copyright": "Garum Vinoteca",
     "electronVersion": "33.4.11",
-    "electronDist": "../../node_modules/electron/dist",
     "directories": {
       "buildResources": "resources",
       "output": "dist-out"
