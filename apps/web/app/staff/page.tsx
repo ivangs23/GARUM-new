@@ -271,8 +271,9 @@ export default function StaffPage() {
             src="/Logo%20garum.png"
             alt="Garum Vinoteca"
             className="staff-logo"
-            width={48}
-            height={48}
+            width={786}
+            height={472}
+            style={{ height: '36px', width: 'auto', display: 'block' }}
             priority
           />
           <span className="header-sub">Panel de Comandas</span>
@@ -415,7 +416,7 @@ export default function StaffPage() {
           flex: 1;
         }
         .badge {
-          background: rgba(255, 255, 255, 0.1);
+          background: #2a2a2a;
           border-radius: 20px;
           padding: 0.15rem 0.6rem;
           font-size: 0.8rem;

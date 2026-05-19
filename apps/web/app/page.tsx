@@ -35,8 +35,9 @@ export default function Home() {
             src="/Logo%20garum.png"
             alt="Garum Vinoteca"
             className="brand-logo"
-            width={220}
-            height={220}
+            width={786}
+            height={472}
+            style={{ width: '200px', height: 'auto', display: 'block', margin: '0 auto' }}
             priority
           />
         </div>
@@ -100,14 +101,14 @@ export default function Home() {
         }
         .header {
           text-align: center;
-          padding: 3rem 2rem 2.5rem;
+          padding: 1.6rem 2rem 1.4rem;
           width: 100%;
           background: var(--surface);
           box-shadow: 0 2px 12px rgba(0,0,0,0.06);
         }
         .logo-wrap { margin-bottom: 0; }
         .brand-logo {
-          width: 200px;
+          width: 160px;
           height: auto;
           display: block;
           margin: 0 auto;
@@ -116,7 +117,7 @@ export default function Home() {
           width: 50px;
           height: 1px;
           background: var(--primary);
-          margin: 1.6rem auto 0;
+          margin: 1rem auto 0;
           opacity: 0.4;
         }
 
@@ -125,7 +126,7 @@ export default function Home() {
           max-width: 680px;
           padding: 2.5rem 2.5rem 2.5rem;
           margin: 2rem 1.5rem;
-          background: rgba(255, 255, 255, 0.92);
+          background: var(--surface);
           border-radius: 16px;
           box-shadow: 0 2px 20px rgba(0,0,0,0.06);
         }

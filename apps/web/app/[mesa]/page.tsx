@@ -206,7 +206,7 @@ function CategoryMenuSection({
 
       <style jsx>{`
         .cat-section {
-          margin-bottom: 3rem;
+          margin-bottom: 2.5rem;
         }
         .cat-subsection {
           margin-top: 2rem;
@@ -219,7 +219,7 @@ function CategoryMenuSection({
           border-left: 3px solid var(--primary);
           padding: 0.4rem 0.8rem;
           font-family: var(--font-playfair);
-          background: rgba(255, 255, 255, 0.92);
+          background: var(--surface);
           border-radius: 0 10px 10px 0;
           display: inline-block;
         }
@@ -687,8 +687,9 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
             src="/Logo%20garum.png"
             alt="Garum Vinoteca"
             className="error-logo"
-            width={160}
-            height={160}
+            width={786}
+            height={472}
+            style={{ width: '160px', height: 'auto', display: 'block', margin: '0 auto' }}
             priority
           />
           <h2 className="serif">{t("menu.errorTitle")}</h2>
@@ -745,8 +746,9 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
             src="/Logo%20garum.png"
             alt="Garum Vinoteca"
             className="maintenance-logo"
-            width={160}
-            height={160}
+            width={786}
+            height={472}
+            style={{ width: '160px', height: 'auto', display: 'block', margin: '0 auto' }}
             priority
           />
           <div className="maintenance-icon">🔧</div>
@@ -826,8 +828,9 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
               src="/Logo%20garum.png"
               alt="Garum Vinoteca"
               className="nav-logo-img"
-              width={48}
-              height={48}
+              width={786}
+              height={472}
+              style={{ height: '36px', width: 'auto', display: 'block' }}
               priority
             />
           </Link>
@@ -1504,7 +1507,7 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
       <style jsx>{`
         .menu-container {
           min-height: 100vh;
-          padding-top: calc(110px + env(safe-area-inset-top));
+          padding-top: calc(64px + env(safe-area-inset-top));
           padding-bottom: calc(120px + env(safe-area-inset-bottom));
           background: transparent;
         }
@@ -1568,7 +1571,7 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
         }
         @media (max-width: 600px) {
           .menu-container {
-            padding-top: calc(80px + env(safe-area-inset-top));
+            padding-top: calc(56px + env(safe-area-inset-top));
           }
         }
         @media (max-width: 360px) {
@@ -1643,10 +1646,8 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
           overflow-x: auto;
           scrollbar-width: none;
           position: sticky;
-          top: 72px;
-          background: var(--background);
-          background-image: url("/pattern.svg");
-          background-size: 260px 260px;
+          top: 64px;
+          background: var(--surface);
           z-index: 90;
           border-bottom: 1px solid var(--border);
           align-items: center;
@@ -1750,7 +1751,7 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
         .welcome-header {
           text-align: center;
           margin-bottom: 2.5rem;
-          background: rgba(255, 255, 255, 0.92);
+          background: var(--surface);
           border-radius: 14px;
           padding: 1.5rem 1.5rem 1rem;
           box-shadow: 0 2px 16px rgba(0, 0, 0, 0.05);
@@ -1838,7 +1839,7 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
         .menu-list {
           max-width: 800px;
           margin: 0 auto;
-          padding: 1.5rem 1rem;
+          padding: 2.5rem 1rem 1.5rem;
           position: relative;
           z-index: 1;
         }
@@ -2310,7 +2311,7 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
           height: 40px;
           border-radius: 50%;
           border: none;
-          background: rgba(255, 255, 255, 0.92);
+          background: var(--surface);
           color: var(--text);
           cursor: pointer;
           display: flex;
@@ -2408,7 +2409,7 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
           z-index: 150;
         }
         .pay-error-toast button {
-          background: rgba(255, 255, 255, 0.2);
+          background: rgba(139, 30, 30, 0.6);
           border: none;
           color: #fff;
           width: 28px;
@@ -2421,7 +2422,7 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
           flex-shrink: 0;
         }
         .pay-error-toast button:hover {
-          background: rgba(255, 255, 255, 0.3);
+          background: rgba(139, 30, 30, 0.85);
         }
 
         .footer-cart-wrap {

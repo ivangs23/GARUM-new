@@ -47,8 +47,9 @@ export default function AdminLoginPage() {
             src="/Logo%20garum.png"
             alt="Garum Vinoteca"
             className="login-logo"
-            width={120}
-            height={120}
+            width={786}
+            height={472}
+            style={{ width: '160px', height: 'auto', display: 'block', margin: '0 auto 0.6rem' }}
             priority
           />
           <p className="subtitle serif">Panel de Administración</p>

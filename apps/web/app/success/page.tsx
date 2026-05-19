@@ -44,8 +44,9 @@ function SuccessContent() {
         src="/Logo%20garum.png"
         alt="Garum Vinoteca"
         className="logo"
-        width={120}
-        height={120}
+        width={786}
+        height={472}
+        style={{ width: '130px', height: 'auto', display: 'block', margin: '0 auto' }}
         priority
       />
 

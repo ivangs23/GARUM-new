@@ -90,12 +90,10 @@ a {
   background: var(--primary);
 }
 
-/* ── Glassmorphism ── */
+/* ── Surface card ── */
 .glass {
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(123, 79, 150, 0.12);
+  background: var(--surface);
+  border: 1px solid var(--border);
   box-shadow: var(--card-shadow);
 }
 
