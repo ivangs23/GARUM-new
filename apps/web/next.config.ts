@@ -23,6 +23,20 @@ const nextConfig: NextConfig = {
   // scripts y iframes desde js.stripe.com/hooks.stripe.com y construir una
   // política que no los rompa requiere pruebas reales con 3D-Secure.
   // Cuando se aborde, ver: https://docs.stripe.com/security/guide#content-security-policy
+  // Stripe hosts the Apple Pay domain-association file. Redirecting our
+  // .well-known path to Stripe is the documented way to register the domain
+  // without committing the file to the repo.
+  // https://docs.stripe.com/payments/payment-methods/pmd-registration
+  async redirects() {
+    return [
+      {
+        source: "/.well-known/apple-developer-merchantid-domain-association",
+        destination:
+          "https://stripe.com/.well-known/apple-developer-merchantid-domain-association",
+        permanent: false,
+      },
+    ];
+  },
   async headers() {
     return [
       {
