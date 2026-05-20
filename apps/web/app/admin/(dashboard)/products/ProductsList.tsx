@@ -6,6 +6,7 @@ import Image from "next/image";
 import { Pencil, Search, X } from "lucide-react";
 import DeleteProductButton from "./DeleteProductButton";
 import ToggleAvailableButton from "./ToggleAvailableButton";
+import { buildCategoryTree, flattenTree, collectDescendantIds } from "@/lib/category-tree";
 
 export type Category = { id: string; name: string; parent_id: string | null };
 
@@ -33,17 +34,34 @@ export default function ProductsList({
   const [categoryId, setCategoryId] = useState<string>("all");
   const [availability, setAvailability] = useState<Availability>("all");
 
+  const categoryTree = useMemo(() => buildCategoryTree(categories), [categories]);
+  const flatTree = useMemo(() => flattenTree(categoryTree), [categoryTree]);
+
+  // Selecting a parent matches the whole subtree.
+  const subtreeIds = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    const walk = (nodes: typeof categoryTree) => {
+      for (const node of nodes) {
+        map.set(node.id, new Set(collectDescendantIds(node)));
+        walk(node.children);
+      }
+    };
+    walk(categoryTree);
+    return map;
+  }, [categoryTree]);
+
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
+    const allowed = categoryId === "all" ? null : subtreeIds.get(categoryId);
     return products.filter((p) => {
-      if (categoryId !== "all" && p.category_id !== categoryId) return false;
+      if (allowed && (p.category_id == null || !allowed.has(p.category_id))) return false;
       if (availability === "available" && p.is_available === false) return false;
       if (availability === "unavailable" && p.is_available !== false) return false;
       if (!term) return true;
       const hay = `${p.name ?? ""} ${p.description ?? ""}`.toLowerCase();
       return hay.includes(term);
     });
-  }, [products, search, categoryId, availability]);
+  }, [products, search, categoryId, availability, subtreeIds]);
 
   const hasActiveFilters = search.trim() !== "" || categoryId !== "all" || availability !== "all";
 
@@ -80,13 +98,18 @@ export default function ProductsList({
           className="products-select"
           value={categoryId}
           onChange={(e) => setCategoryId(e.target.value)}
+          aria-label="Filtrar por categoría"
         >
           <option value="all">Todas las categorías</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
+          {flatTree.map((c) => {
+            const prefix = c.depth === 0 ? "" : `${"  ".repeat(c.depth)}↳ `;
+            return (
+              <option key={c.id} value={c.id}>
+                {prefix}
+                {c.name}
+              </option>
+            );
+          })}
         </select>
 
         <select
