@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use, useRef } from "react";
 import Link from "next/link";
-import { Search, Plus, Minus, ShoppingBag, ArrowLeft, X, Loader2 } from "lucide-react";
+import { Search, Plus, Minus, ShoppingBag, ArrowLeft, X } from "lucide-react";
 import Image from "next/image";
 import { useCart } from "@/context/CartContext";
 import { useLanguage } from "@/context/LanguageContext";
@@ -656,24 +656,228 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
 
   if (loading)
     return (
-      <div className="loading-screen">
-        <Loader2 size={40} className="spin" />
+      <div className="skeleton-screen" aria-busy="true" aria-live="polite">
+        <span className="sr-only">{t("menu.loading") ?? "Cargando carta…"}</span>
+
+        <header className="sk-navbar" aria-hidden="true">
+          <div className="sk-navbar-content">
+            <div className="sk sk-logo" />
+            <div className="sk-navbar-right">
+              <div className="sk sk-badge" />
+              <div className="sk sk-icon" />
+              <div className="sk sk-icon" />
+            </div>
+          </div>
+        </header>
+
+        <main className="sk-main" aria-hidden="true">
+          <div className="sk-welcome">
+            <div className="sk sk-title" />
+            <div className="sk sk-subtitle" />
+          </div>
+
+          <div className="sk-featured-title">
+            <div className="sk sk-section-title" />
+          </div>
+          <div className="sk-featured-scroll">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="sk-featured-card">
+                <div className="sk sk-featured-img" />
+                <div className="sk sk-line sk-line-80" />
+                <div className="sk sk-line sk-line-50" />
+              </div>
+            ))}
+          </div>
+
+          <div className="sk-cat-grid">
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="sk-cat-card">
+                <div className="sk sk-cat-icon" />
+                <div className="sk sk-line sk-line-70" />
+                <div className="sk sk-line sk-line-40" />
+              </div>
+            ))}
+          </div>
+        </main>
+
         <style jsx>{`
-          .loading-screen {
+          .skeleton-screen {
             min-height: 100vh;
+            background: var(--background);
+          }
+          .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+          }
+
+          .sk {
+            background: linear-gradient(
+              90deg,
+              rgba(123, 79, 150, 0.06) 0%,
+              rgba(123, 79, 150, 0.14) 50%,
+              rgba(123, 79, 150, 0.06) 100%
+            );
+            background-size: 200% 100%;
+            border-radius: 8px;
+            animation: shimmer 1.4s ease-in-out infinite;
+          }
+          @keyframes shimmer {
+            0% {
+              background-position: 200% 0;
+            }
+            100% {
+              background-position: -200% 0;
+            }
+          }
+          @media (prefers-reduced-motion: reduce) {
+            .sk {
+              animation: none;
+            }
+          }
+
+          .sk-navbar {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 0.75rem 1rem;
+          }
+          .sk-navbar-content {
+            max-width: 1200px;
+            margin: 0 auto;
             display: flex;
             align-items: center;
-            justify-content: center;
-            background: transparent;
+            justify-content: space-between;
           }
-          .spin {
-            animation: spin 1s linear infinite;
-            color: var(--primary);
+          .sk-logo {
+            width: 100px;
+            height: 60px;
+            border-radius: 12px;
           }
-          @keyframes spin {
-            to {
-              transform: rotate(360deg);
+          .sk-navbar-right {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+          }
+          .sk-badge {
+            width: 80px;
+            height: 28px;
+            border-radius: 999px;
+          }
+          .sk-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+          }
+
+          .sk-main {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem 1.2rem;
+          }
+          .sk-welcome {
+            background: var(--surface);
+            border-radius: 14px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 16px rgba(0, 0, 0, 0.05);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.75rem;
+          }
+          .sk-title {
+            width: 60%;
+            height: 28px;
+          }
+          .sk-subtitle {
+            width: 80%;
+            height: 14px;
+          }
+
+          .sk-featured-title {
+            margin-bottom: 1rem;
+          }
+          .sk-section-title {
+            width: 180px;
+            height: 22px;
+          }
+          .sk-featured-scroll {
+            display: flex;
+            gap: 1rem;
+            overflow: hidden;
+            margin-bottom: 2rem;
+            padding-bottom: 0.25rem;
+          }
+          .sk-featured-card {
+            flex: 0 0 160px;
+            background: var(--surface);
+            border-radius: 16px;
+            padding: 0.75rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            box-shadow: var(--card-shadow);
+          }
+          .sk-featured-img {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            border-radius: 12px;
+          }
+
+          .sk-cat-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+          }
+          @media (min-width: 640px) {
+            .sk-cat-grid {
+              grid-template-columns: repeat(3, 1fr);
             }
+          }
+          @media (min-width: 1024px) {
+            .sk-cat-grid {
+              grid-template-columns: repeat(4, 1fr);
+            }
+          }
+          .sk-cat-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 1.5rem 1rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.75rem;
+            box-shadow: var(--card-shadow);
+            min-height: 160px;
+          }
+          .sk-cat-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+          }
+
+          .sk-line {
+            height: 12px;
+            border-radius: 6px;
+          }
+          .sk-line-40 {
+            width: 40%;
+          }
+          .sk-line-50 {
+            width: 50%;
+          }
+          .sk-line-70 {
+            width: 70%;
+          }
+          .sk-line-80 {
+            width: 80%;
           }
         `}</style>
       </div>
@@ -1507,7 +1711,7 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
       <style jsx>{`
         .menu-container {
           min-height: 100vh;
-          padding-top: calc(64px + env(safe-area-inset-top));
+          padding-top: calc(86px + env(safe-area-inset-top));
           padding-bottom: calc(120px + env(safe-area-inset-bottom));
           background: transparent;
         }
@@ -1571,7 +1775,7 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
         }
         @media (max-width: 600px) {
           .menu-container {
-            padding-top: calc(56px + env(safe-area-inset-top));
+            padding-top: calc(73px + env(safe-area-inset-top));
           }
         }
         @media (max-width: 360px) {
@@ -1641,16 +1845,23 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
 
         .category-nav {
           display: flex;
-          gap: 0.6rem;
-          padding: 0.8rem 1.2rem;
+          gap: 0.75rem;
+          padding: 0.75rem 1.2rem;
           overflow-x: auto;
           scrollbar-width: none;
           position: sticky;
-          top: 64px;
+          top: calc(86px + env(safe-area-inset-top));
           background: var(--surface);
           z-index: 90;
           border-bottom: 1px solid var(--border);
           align-items: center;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+        }
+        @media (max-width: 600px) {
+          .category-nav {
+            top: calc(73px + env(safe-area-inset-top));
+            padding: 0.6rem 1rem;
+          }
         }
         .category-nav::-webkit-scrollbar {
           display: none;
@@ -1663,10 +1874,28 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
           flex-shrink: 0;
         }
         .back-btn {
-          background: #fff !important;
-          color: var(--primary) !important;
-          border-color: var(--primary) !important;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+          background: var(--primary) !important;
+          color: #fff !important;
+          border: 1px solid var(--primary) !important;
+          padding: 0.5rem 1rem !important;
+          font-weight: 600 !important;
+          font-size: 0.85rem !important;
+          border-radius: 999px !important;
+          box-shadow: 0 4px 12px rgba(123, 79, 150, 0.25);
+          flex-shrink: 0;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          min-height: 40px;
+        }
+        .back-btn:hover {
+          background: var(--primary-hover) !important;
+          border-color: var(--primary-hover) !important;
+          transform: translateY(-1px);
+          box-shadow: 0 6px 16px rgba(123, 79, 150, 0.32);
+        }
+        .back-btn:active {
+          transform: translateY(0);
+          box-shadow: 0 2px 6px rgba(123, 79, 150, 0.2);
         }
 
         .breadcrumb {

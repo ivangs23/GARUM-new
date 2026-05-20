@@ -146,6 +146,7 @@ function printTicket(order: Order, dest: Destination) {
 export default function StaffPage() {
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
   // Audios diferenciados por destino
   const audioCocinaRef = useRef<HTMLAudioElement | null>(null);
   const audioBarraRef = useRef<HTMLAudioElement | null>(null);
@@ -163,6 +164,7 @@ export default function StaffPage() {
       .order("created_at", { ascending: false })
       .limit(50);
     setOrders((data ?? []) as Order[]);
+    setLoading(false);
   }, []);
 
   const playArrivalSound = useCallback((order: Order) => {
@@ -298,12 +300,30 @@ export default function StaffPage() {
               <span className="badge">{col(dest).length}</span>
             </div>
 
-            <div className="orders-list">
-              {col(dest).map((order) => (
-                <OrderCard key={order.id + dest} order={order} dest={dest} onDone={markDone} />
-              ))}
-
-              {col(dest).length === 0 && <div className="empty-col">Sin pedidos pendientes</div>}
+            <div className="orders-list" aria-busy={loading}>
+              {loading ? (
+                <>
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} className="sk-order-card">
+                      <div className="sk-row">
+                        <div className="sk sk-table" />
+                        <div className="sk sk-time" />
+                      </div>
+                      <div className="sk sk-line sk-line-80" />
+                      <div className="sk sk-line sk-line-60" />
+                      <div className="sk sk-line sk-line-70" />
+                      <div className="sk sk-btn" />
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <>
+                  {col(dest).map((order) => (
+                    <OrderCard key={order.id + dest} order={order} dest={dest} onDone={markDone} />
+                  ))}
+                  {col(dest).length === 0 && <div className="empty-col">Sin pedidos pendientes</div>}
+                </>
+              )}
             </div>
           </section>
         ))}
@@ -567,6 +587,51 @@ export default function StaffPage() {
           100% {
             box-shadow: 0 0 0 0 rgba(74, 222, 128, 0);
           }
+        }
+
+        .sk {
+          background: linear-gradient(
+            90deg,
+            rgba(255, 255, 255, 0.04) 0%,
+            rgba(255, 255, 255, 0.1) 50%,
+            rgba(255, 255, 255, 0.04) 100%
+          );
+          background-size: 200% 100%;
+          border-radius: 6px;
+          animation: shimmer 1.4s ease-in-out infinite;
+        }
+        @keyframes shimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .sk { animation: none; }
+        }
+        .sk-order-card {
+          background: #111;
+          border: 1px solid #222;
+          border-radius: 12px;
+          padding: 1rem;
+          display: flex;
+          flex-direction: column;
+          gap: 0.6rem;
+        }
+        .sk-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .sk-table { width: 70px; height: 22px; }
+        .sk-time { width: 50px; height: 14px; }
+        .sk-line { height: 12px; border-radius: 4px; }
+        .sk-line-60 { width: 60%; }
+        .sk-line-70 { width: 70%; }
+        .sk-line-80 { width: 80%; }
+        .sk-btn {
+          width: 100%;
+          height: 36px;
+          border-radius: 8px;
+          margin-top: 0.4rem;
         }
       `}</style>
     </main>
