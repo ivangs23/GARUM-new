@@ -273,7 +273,7 @@ export default function StaffPage() {
             className="staff-logo"
             width={786}
             height={472}
-            style={{ height: '36px', width: 'auto', display: 'block' }}
+            style={{ height: '60px', width: 'auto', display: 'block' }}
             priority
           />
           <span className="header-sub">Panel de Comandas</span>

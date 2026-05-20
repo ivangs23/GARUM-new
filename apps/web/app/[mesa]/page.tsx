@@ -830,7 +830,7 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
               className="nav-logo-img"
               width={786}
               height={472}
-              style={{ height: '36px', width: 'auto', display: 'block' }}
+              style={{ height: '60px', width: 'auto', display: 'block' }}
               priority
             />
           </Link>

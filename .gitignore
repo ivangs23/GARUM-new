@@ -43,3 +43,4 @@ playwright/.cache/
 # Migration backups (one-shot, removed in Task 14)
 .Garum.old/
 .garum-desktop.old/
+.vercel

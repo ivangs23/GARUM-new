@@ -22,7 +22,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           className="admin-topbar-logo"
           width={786}
           height={472}
-          style={{ height: '36px', width: 'auto', display: 'block' }}
+          style={{ height: '60px', width: 'auto', display: 'block' }}
           priority
         />
         <div style={{ width: 40 }} />
