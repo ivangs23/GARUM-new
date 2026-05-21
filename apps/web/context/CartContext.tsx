@@ -8,6 +8,7 @@ export type CartItem = {
   price: number;
   quantity: number;
   destination?: 'cocina' | 'barra';
+  note?: string;
 };
 
 export type CartContextType = {

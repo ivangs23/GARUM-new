@@ -12,6 +12,7 @@ type OrderItem = RoutableItem & {
   name: string;
   price: number;
   quantity: number;
+  note?: string;
 };
 
 type StaffStatus = "pending" | "done" | "na";
@@ -85,6 +86,7 @@ function OrderCard({
           <li key={i}>
             <span className="qty">{item.quantity}×</span>
             {item.name}
+            {item.note && <span className="item-note-staff"> — {item.note}</span>}
           </li>
         ))}
       </ul>
@@ -98,6 +100,15 @@ function OrderCard({
       </div>
     </div>
   );
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function printTicket(order: Order, dest: Destination) {
@@ -117,6 +128,7 @@ function printTicket(order: Order, dest: Destination) {
           .mesa { font-size: 28px; font-weight: 900; margin: 4px 0; }
           .dest { font-size: 11px; text-transform: uppercase; letter-spacing: 2px; }
           .item { display: flex; justify-content: space-between; margin: 3px 0; }
+          .item-note { font-style: italic; font-size: 12px; margin: 0 0 4px 12px; }
           .qty { font-weight: bold; margin-right: 6px; }
           .time { font-size: 11px; color: #555; text-align: center; margin-top: 8px; border-top: 1px dashed #000; padding-top: 6px; }
         </style>
@@ -133,6 +145,7 @@ function printTicket(order: Order, dest: Destination) {
           <div class="item">
             <span><span class="qty">${i.quantity}x</span>${i.name}</span>
           </div>
+          ${i.note ? `<div class="item-note">↳ ${escapeHtml(i.note)}</div>` : ""}
         `
           )
           .join("")}
@@ -525,6 +538,11 @@ export default function StaffPage() {
           color: var(--primary);
           font-weight: 700;
           margin-right: 0.4rem;
+        }
+        .item-note-staff {
+          color: #fbbf24;
+          font-style: italic;
+          font-weight: 600;
         }
 
         .card-actions {

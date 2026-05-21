@@ -416,6 +416,7 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
   const [showSearch, setShowSearch] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedExtras, setSelectedExtras] = useState<Extra[]>([]);
+  const [productNote, setProductNote] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -537,20 +538,31 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
   const openProduct = (p: Product) => {
     setSelectedProduct(p);
     setSelectedExtras([]);
+    setProductNote("");
   };
 
   const confirmAdd = () => {
     if (!selectedProduct) return;
     const extra = selectedExtras.reduce((s, e) => s + e.price, 0);
+    const trimmedNote = productNote.trim().slice(0, 200);
+    const baseId =
+      selectedProduct.id +
+      (selectedExtras.length ? "_" + selectedExtras.map((e) => e.id).join("_") : "");
+    // Si hay nota, generar id único para que cada nota distinta sea línea propia
+    // del carrito en vez de fusionarse con otra entrada del mismo producto.
+    const noteSuffix = trimmedNote
+      ? "|n" + (typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID().slice(0, 8)
+          : Math.random().toString(36).slice(2, 10))
+      : "";
     addItem({
-      id:
-        selectedProduct.id +
-        (selectedExtras.length ? "_" + selectedExtras.map((e) => e.id).join("_") : ""),
+      id: baseId + noteSuffix,
       name:
         selectedProduct.name +
         (selectedExtras.length ? ` (${selectedExtras.map((e) => e.name).join(", ")})` : ""),
       price: Number(selectedProduct.price) + extra,
       destination: selectedProduct.destination,
+      ...(trimmedNote ? { note: trimmedNote } : {}),
     });
     setSelectedProduct(null);
   };
@@ -1491,6 +1503,21 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
                 </div>
               )}
 
+              <div className="product-note-section">
+                <label htmlFor="product-note" className="product-note-label">
+                  {t("menu.notesTitle")}
+                </label>
+                <textarea
+                  id="product-note"
+                  className="product-note-input"
+                  placeholder={t("menu.notesPlaceholder")}
+                  value={productNote}
+                  onChange={(e) => setProductNote(e.target.value)}
+                  maxLength={200}
+                  rows={2}
+                />
+              </div>
+
               <button className="gold-button modal-add-btn" onClick={confirmAdd}>
                 {t("menu.addToOrder")} —{" "}
                 {(
@@ -1514,6 +1541,7 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
                         className="pairing-card"
                         onClick={() => {
                           setSelectedExtras([]);
+                          setProductNote("");
                           setSelectedProduct(wine);
                         }}
                         aria-label={`${wine.name} — ${Number(wine.price).toFixed(2)}€`}
@@ -1646,6 +1674,7 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
                 <div key={item.id} className="cart-item">
                   <div className="item-details">
                     <span className="item-name">{item.name}</span>
+                    {item.note && <span className="item-note">“{item.note}”</span>}
                     <span className="item-price-unit">{item.price.toFixed(2)}€ / ud.</span>
                   </div>
                   <div className="item-actions">
@@ -2611,6 +2640,38 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
           color: var(--primary);
           font-size: 0.85rem;
         }
+        .product-note-section {
+          border-top: 1px solid var(--border);
+          padding-top: 0.75rem;
+          display: flex;
+          flex-direction: column;
+          gap: 0.4rem;
+        }
+        .product-note-label {
+          font-size: 0.8rem;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          color: var(--text-muted);
+        }
+        .product-note-input {
+          width: 100%;
+          font-family: inherit;
+          font-size: 0.95rem;
+          color: var(--text);
+          background: var(--surface);
+          border: 1px solid var(--border);
+          border-radius: 8px;
+          padding: 0.6rem 0.75rem;
+          resize: vertical;
+          min-height: 2.5rem;
+          line-height: 1.35;
+          outline: none;
+          transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .product-note-input:focus {
+          border-color: var(--primary);
+          box-shadow: 0 0 0 3px var(--primary-light);
+        }
         .modal-add-btn {
           width: 100%;
           justify-content: center;
@@ -2763,6 +2824,12 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
         .item-price-unit {
           font-size: 0.8rem;
           color: var(--text-muted);
+        }
+        .item-note {
+          font-size: 0.85rem;
+          color: var(--secondary);
+          font-style: italic;
+          line-height: 1.3;
         }
 
         .item-actions {

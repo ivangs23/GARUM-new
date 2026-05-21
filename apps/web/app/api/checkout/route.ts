@@ -8,8 +8,10 @@ const stripe = new Stripe(requireServerEnv("STRIPE_SECRET_KEY"), {
 });
 
 // UUIDs only contain hex chars and hyphens — '_' is a safe separator
+// '|' separa el sufijo de nota único (no afecta a producto/extras)
 function parseItemId(id: string | number): { productId: string; extraIds: string[] } {
-  const parts = String(id).split("_");
+  const idCore = String(id).split("|")[0];
+  const parts = idCore.split("_");
   return { productId: parts[0], extraIds: parts.slice(1) };
 }
 
@@ -18,6 +20,7 @@ type CartItemInput = {
   name: string;
   quantity: number | string;
   destination?: "cocina" | "barra" | null;
+  note?: string;
 };
 
 type ValidatedItem = {
@@ -26,6 +29,7 @@ type ValidatedItem = {
   price: number;
   quantity: number;
   destination: "cocina" | "barra" | null;
+  note?: string;
 };
 
 export async function POST(req: Request) {
@@ -119,12 +123,15 @@ export async function POST(req: Request) {
       const qty = Math.floor(Number(item.quantity));
       totalCents += priceCents * qty;
 
+      const note =
+        typeof item.note === "string" ? item.note.trim().slice(0, 200) : "";
       validatedItems.push({
         id: item.id,
         name: item.name,
         price: priceCents / 100, // store in euros, verified server-side
         quantity: qty,
         destination: item.destination ?? null,
+        ...(note ? { note } : {}),
       });
     }
 
