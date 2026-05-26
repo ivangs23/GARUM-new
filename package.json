@@ -15,6 +15,10 @@
     "desktop:dist:win": "pnpm --filter garum-desktop dist:win",
     "desktop:dist:mac": "pnpm --filter garum-desktop dist:mac",
     "desktop:dist": "pnpm --filter garum-desktop dist",
+    "desktop:release": "node scripts/release-desktop.mjs",
+    "desktop:release:patch": "node scripts/release-desktop.mjs patch",
+    "desktop:release:minor": "node scripts/release-desktop.mjs minor",
+    "desktop:release:major": "node scripts/release-desktop.mjs major",
     "prepare": "husky"
   },
   "devDependencies": {
