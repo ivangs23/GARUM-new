@@ -43,35 +43,58 @@ public class GarumRawPrinter {
   public static extern bool EndPagePrinter(IntPtr hPrinter);
   [DllImport("winspool.Drv", EntryPoint="WritePrinter", SetLastError=true, ExactSpelling=true, CallingConvention=CallingConvention.StdCall)]
   public static extern bool WritePrinter(IntPtr hPrinter, IntPtr pBytes, Int32 dwCount, out Int32 dwWritten);
-  public static bool Send(string printerName, byte[] bytes) {
+  public static int Send(string printerName, byte[] bytes) {
+    // Códigos de retorno:
+    //   bytes escritos  → éxito (>=1).
+    //   -1 OpenPrinter fail   /   -2 StartDocPrinter fail
+    //   -3 StartPagePrinter   /   -4 WritePrinter fail
+    //   -5 written != bytes.Length (escritura truncada)
     IntPtr h;
     DOCINFOA di = new DOCINFOA();
     di.pDocName = "Garum Ticket";
     di.pDataType = "RAW";
-    bool ok = false;
-    if (OpenPrinter(printerName, out h, IntPtr.Zero)) {
-      if (StartDocPrinter(h, 1, di)) {
-        if (StartPagePrinter(h)) {
-          Int32 written = 0;
-          IntPtr p = Marshal.AllocCoTaskMem(bytes.Length);
-          Marshal.Copy(bytes, 0, p, bytes.Length);
-          ok = WritePrinter(h, p, bytes.Length, out written);
-          Marshal.FreeCoTaskMem(p);
-          EndPagePrinter(h);
-        }
-        EndDocPrinter(h);
+    int result = -1;
+    if (!OpenPrinter(printerName, out h, IntPtr.Zero)) return -1;
+    try {
+      if (!StartDocPrinter(h, 1, di)) { result = -2; }
+      else {
+        try {
+          if (!StartPagePrinter(h)) { result = -3; }
+          else {
+            Int32 written = 0;
+            IntPtr p = Marshal.AllocCoTaskMem(bytes.Length);
+            Marshal.Copy(bytes, 0, p, bytes.Length);
+            bool wrote = WritePrinter(h, p, bytes.Length, out written);
+            Marshal.FreeCoTaskMem(p);
+            EndPagePrinter(h);
+            if (!wrote) result = -4;
+            else if (written != bytes.Length) result = -5;
+            else result = written;
+          }
+        } finally { EndDocPrinter(h); }
       }
-      ClosePrinter(h);
-    }
-    return ok;
+    } finally { ClosePrinter(h); }
+    return result;
   }
 }
 '@
 $bytes = [System.IO.File]::ReadAllBytes($env:GARUM_TICKET_FILE)
-$ok = [GarumRawPrinter]::Send($env:GARUM_PRINTER_NAME, $bytes)
-if (-not $ok) {
+$result = [GarumRawPrinter]::Send($env:GARUM_PRINTER_NAME, $bytes)
+if ($result -lt 1) {
   $err = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
-  Write-Error "WritePrinter failed (Win32 error $err)"
+  $stage = switch ($result) {
+    -1 { "OpenPrinter" }
+    -2 { "StartDocPrinter" }
+    -3 { "StartPagePrinter" }
+    -4 { "WritePrinter" }
+    -5 { "WritePrinter (truncada)" }
+    default { "desconocido" }
+  }
+  Write-Error "$stage falló (Win32 error $err, esperado=$($bytes.Length) bytes)"
+  exit 1
+}
+if ($result -ne $bytes.Length) {
+  Write-Error "Escritura parcial: $result de $($bytes.Length) bytes"
   exit 1
 }
 `;
@@ -127,15 +150,28 @@ function buildEscPosBuffer(lines: TicketLine[]): Buffer {
   return printer.getBuffer();
 }
 
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
 async function sendRawToWindowsPrinter(printerName: string, bytes: Buffer): Promise<void> {
-  // Validamos antes de gastar el Add-Type de PowerShell.
+  // Verifica existencia + estado online antes de gastar el Add-Type.
+  // PrinterStatus 'Normal' o 'Idle' = OK; cualquier otro (Offline,
+  // PaperOut, Paused, Error, Jammed) lo reportamos.
   const safeName = printerName.replace(/'/g, "''");
   try {
-    await execAsync(
-      `powershell -NoProfile -Command "Get-Printer -Name '${safeName}' -ErrorAction Stop | Out-Null"`,
+    const { stdout } = await execAsync(
+      `powershell -NoProfile -Command "(Get-Printer -Name '${safeName}' -ErrorAction Stop).PrinterStatus"`,
       { timeout: 5000 },
     );
+    const status = stdout.trim();
+    if (status && status !== 'Normal' && status !== 'Idle') {
+      throw new Error(
+        `Impresora "${printerName}" no disponible (estado="${status}"). Revisa papel/tapa/conexión.`,
+      );
+    }
   } catch (err) {
+    // Si el error ya viene formateado por arriba, propágalo. Si es el exec
+    // el que falló (Get-Printer no encontró el dispositivo), enriquece.
+    if (err instanceof Error && err.message.startsWith('Impresora ')) throw err;
     const detail = extractExecError(err);
     throw new Error(`No se encontró la impresora "${printerName}" en Windows. ${detail}`);
   }
@@ -147,21 +183,35 @@ async function sendRawToWindowsPrinter(printerName: string, bytes: Buffer): Prom
   // BOM UTF-8 para que PowerShell interprete bien acentos en la cadena C#.
   writeFileSync(tmpPs1, '﻿' + WIN_RAW_PS, { encoding: 'utf8' });
 
+  // Retry interno: hasta 3 intentos con back-off 800ms. Cubre el caso de
+  // winspool ocupado por el job anterior cuando el mutex de printer/index.ts
+  // libera el slot pero el servicio aún está cerrando el handle.
+  const MAX_TRIES = 3;
+  let lastErr: unknown = null;
   try {
-    await execAsync(
-      `powershell -NoProfile -ExecutionPolicy Bypass -File "${tmpPs1}"`,
-      {
-        timeout: 20000,
-        env: {
-          ...process.env,
-          GARUM_PRINTER_NAME: printerName,
-          GARUM_TICKET_FILE: tmpBin,
-        },
-      },
+    for (let attempt = 1; attempt <= MAX_TRIES; attempt++) {
+      try {
+        await execAsync(
+          `powershell -NoProfile -ExecutionPolicy Bypass -File "${tmpPs1}"`,
+          {
+            timeout: 20000,
+            env: {
+              ...process.env,
+              GARUM_PRINTER_NAME: printerName,
+              GARUM_TICKET_FILE: tmpBin,
+            },
+          },
+        );
+        return; // éxito
+      } catch (err) {
+        lastErr = err;
+        if (attempt < MAX_TRIES) await sleep(800 * attempt); // 800, 1600
+      }
+    }
+    const detail = extractExecError(lastErr);
+    throw new Error(
+      `Spooler de Windows rechazó el envío a "${printerName}" tras ${MAX_TRIES} intentos. ${detail}`,
     );
-  } catch (err) {
-    const detail = extractExecError(err);
-    throw new Error(`Spooler de Windows rechazó el envío a "${printerName}". ${detail}`);
   } finally {
     try { unlinkSync(tmpBin); } catch { /* ignorar */ }
     try { unlinkSync(tmpPs1); } catch { /* ignorar */ }
