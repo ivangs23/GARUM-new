@@ -51,8 +51,9 @@ writeFileSync(PKG_PATH, JSON.stringify(pkg, null, 2) + '\n');
 
 sh('git add apps/desktop/package.json');
 sh(`git commit -m "chore(desktop): release ${tag}"`);
-sh(`git tag ${tag}`);
-sh('git push origin HEAD --follow-tags');
+sh(`git tag -a ${tag} -m "Desktop release ${tag}"`);
+sh('git push origin HEAD');
+sh(`git push origin ${tag}`);
 
 console.log(`\nRelease ${tag} pushed. Track build:`);
 console.log(`  https://github.com/ivangs23/GARUM-new/actions`);
