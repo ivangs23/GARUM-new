@@ -33,9 +33,11 @@ let savedKey  = '';
 let savedWin: BrowserWindow | null = null;
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
 let midnightTimer: ReturnType<typeof setTimeout> | null = null;
+let printPollTimer: ReturnType<typeof setInterval> | null = null;
 let retryDelay = 5000; // ms — se duplica en cada fallo, máx 60 s
 let retryCount = 0;
 const MAX_RETRIES = 10; // tras 10 intentos fallidos deja de reconectar
+const PRINT_POLL_MS = 10_000; // safety net: cada 10 s reintentamos pedidos sin imprimir
 
 let currentStatus: ConnectionStatus = 'connecting';
 let currentMaintenance: MaintenanceState = { enabled: false, message: '' };
@@ -126,6 +128,7 @@ export async function startRealtimeListener(
         retryCount = 0;
         sendStatus(win, 'connected');
         scheduleMidnightRollover(win);
+        startPrintPoller();
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
         sendStatus(win, 'disconnected');
         scheduleReconnect();
@@ -153,6 +156,7 @@ export async function startRealtimeListener(
 export async function stopRealtimeListener(): Promise<void> {
   cancelReconnect();
   if (midnightTimer) { clearTimeout(midnightTimer); midnightTimer = null; }
+  stopPrintPoller();
   await teardownChannels();
   supabase    = null;
   savedUrl    = '';
@@ -250,30 +254,11 @@ async function reprintMissed(list: Order[]): Promise<void> {
   if (!supabase) return;
   const { printers } = loadConfig();
   if (printers.length === 0) return;
+  // Misma ruta que pedidos nuevos: reserva + cola por dispositivo + libera
+  // en fallo. Encadenamos secuencialmente para no saturar el spooler al
+  // arrancar con varios pedidos pendientes.
   for (const order of list) {
-    // UPDATE atómico: marca printed_at solo si seguía NULL. Si dos
-    // instancias del desktop están abiertas, solo una imprimirá.
-    const { data, error } = await supabase
-      .from('orders')
-      .update({ printed_at: new Date().toISOString() })
-      .eq('id', order.id)
-      .is('printed_at', null)
-      .select('id');
-    if (error) {
-      console.error('[Realtime] error reservando print:', error.message);
-      continue;
-    }
-    if (!data || data.length === 0) continue; // otra instancia se lo llevó
-    const failures = await printOrder(order, printers);
-    if (failures.length === 0) continue;
-    if (failures.length === printers.length) {
-      await supabase.from('orders').update({ printed_at: null }).eq('id', order.id);
-    }
-    savedWin?.webContents.send(IPC.PRINT_ERROR, {
-      orderId: order.id,
-      mesa: order.table_number,
-      reason: failures.map(f => `${f.label}: ${f.reason}`).join(' · '),
-    });
+    await reservePrintAndDispatch(order);
   }
 }
 
@@ -367,15 +352,25 @@ function handleChange(order: Order, win: BrowserWindow): void {
   }
 }
 
+/**
+ * Marcas en memoria de pedidos cuya impresión está en curso, para evitar
+ * que el poller redispare un job sobre un id que ya tiene una promesa viva.
+ * NO sustituye a la reserva en DB (que cubre el caso multi-instancia);
+ * complementa el caso del poller-vs-Realtime dentro del mismo proceso.
+ */
+const inFlightPrints = new Set<string>();
+
 async function reservePrintAndDispatch(order: Order): Promise<void> {
   if (!supabase) return;
+  if (inFlightPrints.has(order.id)) return;
   const { printers } = loadConfig();
   if (printers.length === 0) {
     diag('[Realtime] reservePrint: sin impresoras configuradas (loadConfig vacía).');
     return;
   }
 
-  // Reserva: solo imprime si printed_at sigue NULL.
+  // Reserva: marca printed_at = ahora SOLO si seguía NULL. Si otra instancia
+  // (otro POS abierto) ya lo reservó, .select() devuelve vacío y salimos.
   const { data, error } = await supabase
     .from('orders')
     .update({ printed_at: new Date().toISOString() })
@@ -386,21 +381,64 @@ async function reservePrintAndDispatch(order: Order): Promise<void> {
     console.error('[Realtime] error reservando print:', error.message);
     return;
   }
-  if (!data || data.length === 0) return; // otra instancia se llevó la impresión
+  if (!data || data.length === 0) return;
 
-  const failures = await printOrder(order, printers);
-  if (failures.length === 0) return;
+  inFlightPrints.add(order.id);
+  try {
+    const failures = await printOrder(order, printers);
+    if (failures.length === 0) return;
 
-  // Si TODAS las impresoras fallaron, liberar reserva para reintentar.
-  // En éxito parcial dejamos printed_at puesto: ya hay copia en alguna.
-  if (failures.length === printers.length) {
+    // Si CUALQUIER impresora aplicable al pedido falló, liberar reserva para
+    // reintentar en el siguiente poll. Asumimos que el ticket es idempotente
+    // a nivel humano (un cocinero ve dos tickets iguales y cocina una vez).
+    // Mejor reimprimir de más que perder un pedido.
     await supabase.from('orders').update({ printed_at: null }).eq('id', order.id);
+    // Refleja en cache la liberación para que el poller lo vea.
+    const cached = orders.get(order.id);
+    if (cached) orders.set(order.id, { ...cached, printed_at: null });
+
+    savedWin?.webContents.send(IPC.PRINT_ERROR, {
+      orderId: order.id,
+      mesa: order.table_number,
+      reason: failures.map(f => `${f.label}: ${f.reason}`).join(' · '),
+    });
+  } finally {
+    inFlightPrints.delete(order.id);
   }
-  savedWin?.webContents.send(IPC.PRINT_ERROR, {
-    orderId: order.id,
-    mesa: order.table_number,
-    reason: failures.map(f => `${f.label}: ${f.reason}`).join(' · '),
-  });
+}
+
+// ─── Polling fallback (impresión) ─────────────────────────────────────────────
+//
+// Cada PRINT_POLL_MS revisamos la cache: pedidos con algún destino pendiente
+// y `printed_at IS NULL` se reenvían a `reservePrintAndDispatch`. Cubre:
+//   - Carrera entre `handleChange` y la reserva en DB (otra instancia).
+//   - Liberaciones de printed_at tras fallo de impresora intermitente.
+//   - Eventos Realtime perdidos (red caída + reconexión sin replay).
+
+function startPrintPoller(): void {
+  if (printPollTimer) return;
+  printPollTimer = setInterval(() => {
+    if (!savedWin || savedWin.isDestroyed()) return;
+    const { printers } = loadConfig();
+    if (printers.length === 0) return;
+    for (const order of orders.values()) {
+      if (order.printed_at != null) continue;
+      const stillPending =
+        order.staff_status_kitchen === 'pending' ||
+        order.staff_status_bar === 'pending';
+      if (!stillPending) continue;
+      if (inFlightPrints.has(order.id)) continue;
+      diag(`[Realtime] poll-retry print orden ${order.id} mesa ${order.table_number}`);
+      void reservePrintAndDispatch(order);
+    }
+  }, PRINT_POLL_MS);
+}
+
+function stopPrintPoller(): void {
+  if (printPollTimer) {
+    clearInterval(printPollTimer);
+    printPollTimer = null;
+  }
 }
 
 // ─── Acciones ─────────────────────────────────────────────────────────────────
