@@ -9,6 +9,69 @@ import { buildTicketLines, type TicketDestination, type TicketLine } from '@garu
 
 const execAsync = promisify(exec);
 
+// Helper PowerShell + C# que envía bytes RAW a la cola de impresión Win32
+// (winspool.drv). Permite mandar ESC/POS sin que el driver lo procese como
+// texto. Patrón de Microsoft KB 322091. Se inyecta en cada invocación: el
+// coste de Add-Type es ~300-500 ms, asumible para un ticket por pedido.
+const WIN_RAW_PS = `
+Add-Type -TypeDefinition @'
+using System;
+using System.IO;
+using System.Runtime.InteropServices;
+public class GarumRawPrinter {
+  [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Unicode)]
+  public struct DOCINFOA {
+    [MarshalAs(UnmanagedType.LPWStr)] public string pDocName;
+    [MarshalAs(UnmanagedType.LPWStr)] public string pOutputFile;
+    [MarshalAs(UnmanagedType.LPWStr)] public string pDataType;
+  }
+  [DllImport("winspool.Drv", EntryPoint="OpenPrinterW", SetLastError=true, CharSet=CharSet.Unicode, ExactSpelling=true, CallingConvention=CallingConvention.StdCall)]
+  public static extern bool OpenPrinter([MarshalAs(UnmanagedType.LPWStr)] string szPrinter, out IntPtr hPrinter, IntPtr pd);
+  [DllImport("winspool.Drv", EntryPoint="ClosePrinter", SetLastError=true, ExactSpelling=true, CallingConvention=CallingConvention.StdCall)]
+  public static extern bool ClosePrinter(IntPtr hPrinter);
+  [DllImport("winspool.Drv", EntryPoint="StartDocPrinterW", SetLastError=true, CharSet=CharSet.Unicode, ExactSpelling=true, CallingConvention=CallingConvention.StdCall)]
+  public static extern bool StartDocPrinter(IntPtr hPrinter, Int32 level, [In, MarshalAs(UnmanagedType.LPStruct)] DOCINFOA di);
+  [DllImport("winspool.Drv", EntryPoint="EndDocPrinter", SetLastError=true, ExactSpelling=true, CallingConvention=CallingConvention.StdCall)]
+  public static extern bool EndDocPrinter(IntPtr hPrinter);
+  [DllImport("winspool.Drv", EntryPoint="StartPagePrinter", SetLastError=true, ExactSpelling=true, CallingConvention=CallingConvention.StdCall)]
+  public static extern bool StartPagePrinter(IntPtr hPrinter);
+  [DllImport("winspool.Drv", EntryPoint="EndPagePrinter", SetLastError=true, ExactSpelling=true, CallingConvention=CallingConvention.StdCall)]
+  public static extern bool EndPagePrinter(IntPtr hPrinter);
+  [DllImport("winspool.Drv", EntryPoint="WritePrinter", SetLastError=true, ExactSpelling=true, CallingConvention=CallingConvention.StdCall)]
+  public static extern bool WritePrinter(IntPtr hPrinter, IntPtr pBytes, Int32 dwCount, out Int32 dwWritten);
+  public static bool Send(string printerName, byte[] bytes) {
+    IntPtr h;
+    DOCINFOA di = new DOCINFOA();
+    di.pDocName = "Garum Ticket";
+    di.pDataType = "RAW";
+    bool ok = false;
+    if (OpenPrinter(printerName, out h, IntPtr.Zero)) {
+      if (StartDocPrinter(h, 1, di)) {
+        if (StartPagePrinter(h)) {
+          Int32 written = 0;
+          IntPtr p = Marshal.AllocCoTaskMem(bytes.Length);
+          Marshal.Copy(bytes, 0, p, bytes.Length);
+          ok = WritePrinter(h, p, bytes.Length, out written);
+          Marshal.FreeCoTaskMem(p);
+          EndPagePrinter(h);
+        }
+        EndDocPrinter(h);
+      }
+      ClosePrinter(h);
+    }
+    return ok;
+  }
+}
+'@
+$bytes = [System.IO.File]::ReadAllBytes($env:GARUM_TICKET_FILE)
+$ok = [GarumRawPrinter]::Send($env:GARUM_PRINTER_NAME, $bytes)
+if (-not $ok) {
+  $err = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
+  Write-Error "WritePrinter failed (Win32 error $err)"
+  exit 1
+}
+`;
+
 // ─── Punto de entrada ─────────────────────────────────────────────────────────
 
 export async function printOrderTicket(
@@ -21,9 +84,11 @@ export async function printOrderTicket(
   return printThermalTicket(order, printerConfig);
 }
 
-// ─── Impresión via controlador Windows (GDI) ──────────────────────────────────
-// Funciona con cualquier impresora registrada en Windows: laser, inkjet, PDF, etc.
-// Usa PowerShell Out-Printer (disponible desde Windows 8 / PS 3.0).
+// ─── Impresión via controlador Windows (ESC/POS RAW) ──────────────────────────
+// Construye el buffer ESC/POS con node-thermal-printer (sin tocar la red) y lo
+// inyecta en la cola de Windows con WritePrinter (dataType=RAW). El driver lo
+// pasa directo a la impresora sin reinterpretarlo como GDI/texto, así que
+// honra align, bold, tamaños y corte automático del propio comando ESC/POS.
 
 async function printWindowsTicket(order: Order, config: PrinterConfig): Promise<void> {
   const printerName = config.printerName;
@@ -33,47 +98,61 @@ async function printWindowsTicket(order: Order, config: PrinterConfig): Promise<
 
   const destination = config.destination as TicketDestination;
   const lines = buildTicketLines(order, destination);
-  const text = linesToText(lines);
 
-  // Si tras construir el ticket no hay nada que imprimir, salimos silenciosamente.
-  if (!text.trim()) return;
+  const hasItemLines = lines.some(l => l.kind === 'text' && /^\d+x  /.test(l.text));
+  if (!hasItemLines) return;
 
-  await sendToWindowsPrinter(printerName, text);
+  const buffer = buildEscPosBuffer(lines);
+  await sendRawToWindowsPrinter(printerName, buffer);
 }
 
-function linesToText(lines: TicketLine[]): string {
-  return lines
-    .map(l => {
-      switch (l.kind) {
-        case 'text':    return l.text;
-        case 'divider': return '-'.repeat(40);
-        case 'newline': return '';
-        case 'cut':     return '';
-      }
-    })
-    .join('\r\n');
+function buildEscPosBuffer(lines: TicketLine[]): Buffer {
+  // Interfaz tcp://… es lazy: no abre socket hasta execute(). Aquí solo
+  // usamos getBuffer() para extraer los bytes acumulados.
+  const printer = new ThermalPrinter({
+    type: PrinterTypes.EPSON,
+    interface: 'tcp://127.0.0.1:9100',
+    characterSet: CharacterSet.PC858_EURO,
+    removeSpecialCharacters: false,
+  });
+
+  for (const line of lines) {
+    emitLine(printer, line);
+  }
+
+  return printer.getBuffer();
 }
 
-async function sendToWindowsPrinter(printerName: string, text: string): Promise<void> {
-  // Primero verificamos que la impresora existe y está accesible.
+async function sendRawToWindowsPrinter(printerName: string, bytes: Buffer): Promise<void> {
+  // Validamos antes de gastar el Add-Type de PowerShell.
   const safeName = printerName.replace(/'/g, "''");
   await execAsync(
     `powershell -NoProfile -Command "Get-Printer -Name '${safeName}' -ErrorAction Stop | Out-Null"`,
     { timeout: 5000 },
   );
 
-  // Escribimos el contenido en un archivo temporal y lo mandamos a la impresora.
-  const tmpFile = join(tmpdir(), `garum_${Date.now()}.txt`);
-  writeFileSync(tmpFile, text, { encoding: 'utf8' });
-  const safeFile = tmpFile.replace(/'/g, "''");
+  const stamp = Date.now();
+  const tmpBin = join(tmpdir(), `garum_${stamp}.bin`);
+  const tmpPs1 = join(tmpdir(), `garum_${stamp}.ps1`);
+  writeFileSync(tmpBin, bytes);
+  // BOM UTF-8 para que PowerShell interprete bien acentos en la cadena C#.
+  writeFileSync(tmpPs1, '﻿' + WIN_RAW_PS, { encoding: 'utf8' });
 
   try {
     await execAsync(
-      `powershell -NoProfile -Command "Get-Content -Path '${safeFile}' -Raw | Out-Printer -Name '${safeName}'"`,
-      { timeout: 15000 },
+      `powershell -NoProfile -ExecutionPolicy Bypass -File "${tmpPs1}"`,
+      {
+        timeout: 20000,
+        env: {
+          ...process.env,
+          GARUM_PRINTER_NAME: printerName,
+          GARUM_TICKET_FILE: tmpBin,
+        },
+      },
     );
   } finally {
-    try { unlinkSync(tmpFile); } catch { /* ignorar */ }
+    try { unlinkSync(tmpBin); } catch { /* ignorar */ }
+    try { unlinkSync(tmpPs1); } catch { /* ignorar */ }
   }
 }
 
