@@ -32,7 +32,11 @@ import { startOfTodayMadridIso, isToday, msUntilNextMidnightMadrid } from '@garu
 //     dispatcher global vive sólo en el main process y nunca sale por
 //     IPC, no choca con el clone algorithm.
 setDefaultResultOrder('ipv4first');
-setGlobalDispatcher(new Agent({ connect: { family: 4 } }));
+// El typing del Agent de undici 6 marca `port` como requerido aunque en
+// runtime sólo aplica al opcional `connect`. Casteamos para evitar la
+// fricción TS sin perder la intención: forzar familia IPv4 en todo connect.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+setGlobalDispatcher(new Agent({ connect: { family: 4 } as any }));
 
 let supabase: SupabaseClient | null = null;
 let channel: RealtimeChannel | null = null;
