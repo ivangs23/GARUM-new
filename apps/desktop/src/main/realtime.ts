@@ -1,7 +1,7 @@
 import { BrowserWindow, Notification } from 'electron';
 import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
 import { WebSocket } from 'ws';
-import { Agent, fetch as undiciFetch } from 'undici';
+import { setDefaultResultOrder } from 'dns';
 import { join } from 'path';
 import { updateTrayStatus } from './tray';
 import { loadConfig } from './config';
@@ -15,15 +15,14 @@ import {
 import { diag } from './diag';
 import { startOfTodayMadridIso, isToday, msUntilNextMidnightMadrid } from '@garum/shared/format';
 
-// undici eligió la familia IPv6 al hacer happy-eyeballs contra
-// *.supabase.co en algunas redes del local (router sin IPv6 outbound),
-// y la promesa rechazaba con un escueto "fetch failed" sin causa visible.
-// Forzar familia IPv4 hace que el handshake TLS use la ruta que sí
-// funciona — Realtime ya iba por ws y no sufría el mismo problema.
-const ipv4Dispatcher = new Agent({ connect: { family: 4 } });
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const ipv4Fetch: typeof fetch = ((url: any, init: any) =>
-  undiciFetch(url, { ...(init ?? {}), dispatcher: ipv4Dispatcher })) as any;
+// En el local del cliente undici hacía happy-eyeballs y elegía AAAA
+// contra *.supabase.co; la red no tiene IPv6 outbound y el auth de
+// Supabase rechazaba con un escueto "fetch failed" sin causa visible
+// (Realtime usa ws + family:0 y no sufría el mismo problema).
+// Aplicamos la prioridad IPv4 a nivel de proceso para que TODO consumo
+// de DNS dentro del main process (Supabase auth, electron-updater,
+// cualquier fetch futuro) prefiera la A sobre la AAAA.
+setDefaultResultOrder('ipv4first');
 
 let supabase: SupabaseClient | null = null;
 let channel: RealtimeChannel | null = null;
@@ -80,11 +79,6 @@ export async function startRealtimeListener(
     url: url.slice(0, 40) + '...', keyPrefix: key.slice(0, 12),
   });
   supabase = createClient(url, key, {
-    global: {
-      // Forzamos fetch IPv4 (ver ipv4Fetch arriba). El default de undici a
-      // veces elegía AAAA en este local y la conexión auth nunca se abría.
-      fetch: ipv4Fetch,
-    },
     realtime: {
       // ws en main process — sin esto, realtime-js no encuentra WebSocket usable.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
