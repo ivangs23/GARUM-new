@@ -67,7 +67,8 @@
     "nsis": {
       "oneClick": true,
       "perMachine": false,
-      "runAfterFinish": true
+      "runAfterFinish": true,
+      "artifactName": "Garum-Desktop-Setup-${version}.${ext}"
     },
     "publish": {
       "provider": "github",
