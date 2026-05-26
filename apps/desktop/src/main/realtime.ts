@@ -86,22 +86,35 @@ export async function startRealtimeListener(
     }
   });
 
-  // ── Autenticación con cuenta de servicio (si está configurada) ────────────
+  // ── Autenticación con cuenta de servicio (obligatoria desde la
+  // migración 014 — drop policies anon). Si la cuenta de servicio no
+  // está configurada o la auth falla, el desktop quedaría como anon y
+  // las policies bloquearían el UPDATE de printed_at → ningún ticket
+  // se imprimiría (sin error visible si el caller no mira el log).
+  // Preferimos quedarnos en 'disconnected' y avisar antes que aparentar
+  // estar conectados pero romper la impresión silenciosamente.
   const desktopEmail    = process.env.VITE_DESKTOP_EMAIL;
   const desktopPassword = process.env.VITE_DESKTOP_PASSWORD;
-  if (desktopEmail && desktopPassword) {
-    const { error: authErr } = await supabase.auth.signInWithPassword({
-      email: desktopEmail,
-      password: desktopPassword,
-    });
-    if (authErr) {
-      diag('signIn error (usando anon como fallback):', authErr.message);
-    } else {
-      diag('autenticado como cuenta de servicio del desktop');
-    }
-  } else {
-    diag('VITE_DESKTOP_EMAIL no configurado — usando anon key');
+  if (!desktopEmail || !desktopPassword) {
+    diag(
+      'FATAL: VITE_DESKTOP_EMAIL/VITE_DESKTOP_PASSWORD no embebidos en este build. ' +
+      'El workflow desktop-release.yml debe inyectarlos vía GitHub Secrets. ' +
+      'Sin ellos el desktop no puede reservar printed_at y los tickets no se imprimen.',
+    );
+    sendStatus(win, 'disconnected');
+    return;
   }
+  const { error: authErr } = await supabase.auth.signInWithPassword({
+    email: desktopEmail,
+    password: desktopPassword,
+  });
+  if (authErr) {
+    diag(`FATAL: signIn cuenta servicio desktop falló: ${authErr.message}. ` +
+         `Sin sesión válida, anon no puede reservar printed_at (RLS 014).`);
+    sendStatus(win, 'disconnected');
+    return;
+  }
+  diag('autenticado como cuenta de servicio del desktop');
 
   sendStatus(win, 'connecting');
 
@@ -378,10 +391,24 @@ async function reservePrintAndDispatch(order: Order): Promise<void> {
     .is('printed_at', null)
     .select('id');
   if (error) {
-    console.error('[Realtime] error reservando print:', error.message);
+    // Antes solo se logueaba a console.error (sin volcado a fichero diag),
+    // así que en producción los fallos de RLS (típicos cuando la cuenta de
+    // servicio del desktop no está embebida en el build → se cae a anon →
+    // policy de UPDATE bloquea) eran invisibles en el log. Lo subimos a
+    // diag + lo propagamos al renderer como PRINT_ERROR para que el
+    // operador vea un banner en vez de silencio.
+    diag(`[Realtime] error reservando print orden ${order.id}: ${error.message}`);
+    savedWin?.webContents.send(IPC.PRINT_ERROR, {
+      orderId: order.id,
+      mesa: order.table_number,
+      reason: `Reserva BD: ${error.message}`,
+    });
     return;
   }
-  if (!data || data.length === 0) return;
+  if (!data || data.length === 0) {
+    diag(`[Realtime] reserva sin filas para orden ${order.id} — ya estaba impresa o sin permisos.`);
+    return;
+  }
 
   inFlightPrints.add(order.id);
   try {

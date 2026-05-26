@@ -34,6 +34,20 @@ jobs:
 
       - name: Build renderer/main/preload
         working-directory: apps/desktop
+        # electron.vite.config.ts inyecta estas vars en build time vía `define`.
+        # Sin ellas, el bundle queda con '' → realtime.ts cae a anon y las
+        # policies RLS 014 bloquean el UPDATE de printed_at → no se imprimen
+        # tickets en producción. Estos secrets DEBEN existir en el repo:
+        #   Settings → Secrets and variables → Actions
+        #     VITE_SUPABASE_URL
+        #     VITE_SUPABASE_ANON_KEY
+        #     VITE_DESKTOP_EMAIL
+        #     VITE_DESKTOP_PASSWORD
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_DESKTOP_EMAIL: ${{ secrets.VITE_DESKTOP_EMAIL }}
+          VITE_DESKTOP_PASSWORD: ${{ secrets.VITE_DESKTOP_PASSWORD }}
         run: pnpm run build
 
       - name: Package and publish Windows installer
