@@ -13,6 +13,8 @@ export type CategoryRow = {
   parent_id: string | null;
   destination: "cocina" | "barra";
   sort_order: number | null;
+  icon: string | null;
+  image_url: string | null;
 };
 
 type Destination = "all" | "cocina" | "barra";
@@ -107,6 +109,7 @@ export default function CategoriesList({ categories }: { categories: CategoryRow
         <table className="admin-table">
           <thead>
             <tr>
+              <th style={{ width: 56 }}></th>
               <th>Nombre</th>
               <th>Slug</th>
               <th>Destino</th>
@@ -117,6 +120,32 @@ export default function CategoriesList({ categories }: { categories: CategoryRow
           <tbody>
             {filtered.map((cat) => (
               <tr key={cat.id}>
+                <td>
+                  {cat.image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={cat.image_url}
+                      alt=""
+                      style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+                    />
+                  ) : (
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        display: 'flex',
+                        width: 36,
+                        height: 36,
+                        borderRadius: '50%',
+                        background: 'rgba(255,255,255,0.05)',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '1.2rem',
+                      }}
+                    >
+                      {cat.icon || '—'}
+                    </span>
+                  )}
+                </td>
                 <td>
                   <span
                     style={{
@@ -152,7 +181,7 @@ export default function CategoriesList({ categories }: { categories: CategoryRow
             ))}
             {!filtered.length && (
               <tr>
-                <td colSpan={5} className="empty">
+                <td colSpan={6} className="empty">
                   {categories.length === 0
                     ? "Sin categorías aún"
                     : "Ninguna categoría coincide con los filtros"}

@@ -33,6 +33,7 @@ export interface Database {
           slug: string;
           destination: "cocina" | "barra";
           icon: string | null;
+          image_url: string | null;
           sort_order: number;
           parent_id: string | null;
           created_at: string;
@@ -43,6 +44,7 @@ export interface Database {
           slug: string;
           destination: "cocina" | "barra";
           icon?: string | null;
+          image_url?: string | null;
           sort_order?: number;
           parent_id?: string | null;
           created_at?: string;
@@ -53,6 +55,7 @@ export interface Database {
           slug?: string;
           destination?: "cocina" | "barra";
           icon?: string | null;
+          image_url?: string | null;
           sort_order?: number;
           parent_id?: string | null;
           created_at?: string;

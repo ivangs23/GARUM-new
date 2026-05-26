@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { supabaseBrowser as supabase } from '@/lib/supabase-browser';
 import { useRouter } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Upload, X } from 'lucide-react';
+import Image from 'next/image';
 import { buildCategoryTree, flattenTree, collectDescendantIds, type CategoryNode } from '@/lib/category-tree';
 
 type Category = {
@@ -12,6 +13,7 @@ type Category = {
   slug: string;
   destination: 'cocina' | 'barra';
   icon: string;
+  image_url: string | null;
   sort_order: number;
   parent_id: string | null;
 };
@@ -30,14 +32,40 @@ export default function CategoryForm({
   onCancel?: () => void;
 }) {
   const router = useRouter();
+  const fileRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState<Category>(initial ?? {
-    name: '', slug: '', destination: 'cocina', icon: '', sort_order: 0, parent_id: null,
+    name: '', slug: '', destination: 'cocina', icon: '', image_url: null, sort_order: 0, parent_id: null,
   });
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
 
   const set = (k: keyof Category, v: string | number | null) =>
     setForm(f => ({ ...f, [k]: v }));
+
+  const handleImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const ALLOWED = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!ALLOWED.includes(file.type)) {
+      setError('Solo se permiten imágenes JPEG, PNG, WebP o GIF.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('La imagen no puede superar 5 MB.');
+      return;
+    }
+
+    setUploading(true);
+    const ext  = file.type.split('/')[1].replace('jpeg', 'jpg');
+    const path = `${Date.now()}.${ext}`;
+    const { error: upErr, data } = await supabase.storage.from('categories').upload(path, file);
+    if (upErr) { setError(`Error subiendo imagen: ${upErr.message}`); setUploading(false); return; }
+    const { data: { publicUrl } } = supabase.storage.from('categories').getPublicUrl(data.path);
+    set('image_url', publicUrl);
+    setUploading(false);
+  };
 
   const autoSlug = (name: string) =>
     name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
@@ -123,10 +151,64 @@ export default function CategoryForm({
         </label>
       </div>
 
+      <div className="image-section">
+        <p className="field-label">Foto de la categoría (opcional)</p>
+        <div className="image-preview" onClick={() => fileRef.current?.click()}>
+          {form.image_url ? (
+            <Image src={form.image_url} alt="preview" fill sizes="160px" style={{ objectFit: 'cover' }} />
+          ) : (
+            <div className="image-placeholder">
+              {uploading ? <Loader2 size={24} className="spin" /> : <Upload size={24} />}
+              <span>{uploading ? 'Subiendo...' : 'Subir foto'}</span>
+            </div>
+          )}
+        </div>
+        <input ref={fileRef} type="file" accept="image/*" onChange={handleImage} style={{ display: 'none' }} />
+        {form.image_url && (
+          <button type="button" className="remove-img" onClick={() => set('image_url', null)}>
+            <X size={14} /> Quitar imagen
+          </button>
+        )}
+        <p className="field-hint">Si no hay foto, se mostrará el icono.</p>
+      </div>
+
       <div className="icon-selector-wrap">
         <p className="field-label">Icono de la categoría</p>
         <div className="icon-grid">
-          {['🍷','🥂','🍺','🍹','☕','🥐','🥪','🥩','🐟','🥗','🍰','🧀','🍳','🥘','🍟','🍕','🍦','🍽️'].map(emoji => (
+          {[
+            // Vinos y uvas
+            '🍷','🍇','🍾','🥂',
+            // Cervezas y cócteles
+            '🍺','🍻','🍹','🍸','🥃','🧊',
+            // Refrescos, zumos, agua
+            '🥤','🧃','🧋','💧','🍶',
+            // Café, té, infusiones
+            '☕','🍵','🫖','🧉','🥛',
+            // Panadería y desayuno
+            '🥐','🥖','🍞','🥯','🥞','🧇','🥣',
+            // Sandwiches y entrantes
+            '🥪','🌮','🌯','🥙','🫔',
+            // Carnes
+            '🥩','🍖','🍗','🥓',
+            // Pescados y mariscos
+            '🐟','🐠','🦐','🦑','🦞','🦀','🐙','🍤','🍣',
+            // Verduras y ensaladas
+            '🥗','🥬','🥦','🌽','🥕','🍅','🥑','🌶️',
+            // Quesos, huevos
+            '🧀','🍳','🥚',
+            // Platos calientes
+            '🥘','🍲','🍜','🍝','🍛','🍱','🥟','🍚',
+            // Pizzas y fast food
+            '🍕','🍔','🌭','🍟',
+            // Frutas
+            '🍓','🍒','🍎','🍊','🍋','🍌','🍍','🥭','🍑','🍐','🥝','🍉','🍈',
+            // Postres y dulces
+            '🍰','🧁','🎂','🍮','🍦','🍨','🍧','🍩','🍪','🍫','🍬','🍭','🍯','🥧',
+            // Frutos secos y aperitivos
+            '🥜','🌰','🥨','🍿',
+            // Genéricos
+            '🍽️','🥄','🍴','🧂','👨‍🍳',
+          ].map(emoji => (
             <button
               key={emoji}
               type="button"
@@ -137,6 +219,16 @@ export default function CategoryForm({
             </button>
           ))}
         </div>
+        <label className="custom-icon">
+          <span>¿Necesitas otro? Pega aquí el emoji o texto corto (ej. vino blanco: 🥂🤍, rosado: 🍷🌸)</span>
+          <input
+            type="text"
+            value={form.icon}
+            onChange={e => set('icon', e.target.value)}
+            placeholder="Icono personalizado"
+            maxLength={8}
+          />
+        </label>
       </div>
 
       <div className="form-row">
@@ -188,6 +280,58 @@ export default function CategoryForm({
         }
         .icon-choice:hover { border-color: var(--primary); background: var(--primary-light); transform: scale(1.1); }
         .icon-choice.selected { border-color: var(--primary); background: var(--primary-light); box-shadow: 0 0 0 3px rgba(123, 79, 150, 0.1); }
+        .custom-icon { display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.8rem; color: var(--text-muted); }
+        .custom-icon input {
+          padding: 0.6rem 0.9rem;
+          background: var(--surface);
+          border: 1px solid var(--border);
+          border-radius: 10px;
+          color: var(--text);
+          font-size: 1.2rem;
+          outline: none;
+          max-width: 220px;
+          transition: border-color 0.2s;
+        }
+        .custom-icon input:focus { border-color: var(--primary); }
+        .image-section { display: flex; flex-direction: column; gap: 0.6rem; }
+        .image-preview {
+          position: relative;
+          width: 160px;
+          height: 160px;
+          border-radius: 16px;
+          overflow: hidden;
+          background: #fafafa;
+          border: 1px dashed var(--border);
+          cursor: pointer;
+          transition: border-color 0.2s;
+        }
+        .image-preview:hover { border-color: var(--primary); }
+        .image-placeholder {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 0.4rem;
+          height: 100%;
+          color: var(--text-muted);
+          font-size: 0.85rem;
+        }
+        .remove-img {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.3rem;
+          align-self: flex-start;
+          padding: 0.4rem 0.7rem;
+          background: transparent;
+          border: 1px solid var(--border);
+          border-radius: 8px;
+          color: var(--text-muted);
+          font-size: 0.8rem;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .remove-img:hover { color: #dc2626; border-color: #dc2626; }
+        .field-hint { font-size: 0.78rem; color: var(--text-muted); margin: 0; font-style: italic; }
         .error-msg { color: #dc2626; font-size: 0.85rem; font-weight: 500; }
         .form-actions { display: flex; gap: 1rem; }
         .btn-secondary {

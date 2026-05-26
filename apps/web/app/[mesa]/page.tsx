@@ -65,6 +65,7 @@ type Category = {
   name: string;
   slug: string;
   icon: string | null;
+  image_url: string | null;
   destination: "cocina" | "barra";
   products: Product[];
   parent_id: string | null;
@@ -101,7 +102,12 @@ function CategoryMenuSection({
         <h2 className="cat-section-title">{cat.name}</h2>
       ) : (
         <h3 className="cat-subsection-title">
-          {cat.icon} {cat.name}
+          {cat.image_url ? (
+            <img src={cat.image_url} alt="" className="cat-subsection-thumb" loading="lazy" />
+          ) : (
+            <>{cat.icon} </>
+          )}
+          {cat.name}
         </h3>
       )}
 
@@ -230,7 +236,16 @@ function CategoryMenuSection({
           border-left: 2px solid var(--primary);
           padding-left: 0.6rem;
           margin-bottom: 0.8rem;
-          display: inline-block;
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+        .cat-subsection-thumb {
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+          object-fit: cover;
+          display: block;
         }
 
         .cat-products-list {
@@ -1151,9 +1166,18 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
                 onClick={() => goInto(cat.slug)}
               >
                 <div className="cat-icon-wrap">
-                  <span className="cat-icon-lg" aria-hidden="true">
-                    {cat.icon || "🍷"}
-                  </span>
+                  {cat.image_url ? (
+                    <img
+                      src={cat.image_url}
+                      alt=""
+                      className="cat-image-lg"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <span className="cat-icon-lg" aria-hidden="true">
+                      {cat.icon || "🍷"}
+                    </span>
+                  )}
                 </div>
                 <h3>{cat.name}</h3>
                 <span className="cat-count">
@@ -1330,9 +1354,18 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
                         onClick={() => goInto(child.slug)}
                       >
                         <div className="cat-icon-wrap">
-                          <span className="cat-icon-lg" aria-hidden="true">
-                            {child.icon || "🍷"}
-                          </span>
+                          {child.image_url ? (
+                            <img
+                              src={child.image_url}
+                              alt=""
+                              className="cat-image-lg"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <span className="cat-icon-lg" aria-hidden="true">
+                              {child.icon || "🍷"}
+                            </span>
+                          )}
                         </div>
                         <h3>{child.name}</h3>
                         <span className="cat-count">
@@ -2076,9 +2109,16 @@ export default function MesaPage({ params }: { params: Promise<{ mesa: string }>
           align-items: center;
           justify-content: center;
           margin-bottom: 0.2rem;
+          overflow: hidden;
         }
         .cat-icon-lg {
           font-size: 2rem;
+        }
+        .cat-image-lg {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
         }
         .cat-card h3 {
           font-family: var(--font-playfair);
