@@ -78,7 +78,36 @@ export async function startRealtimeListener(
   diag('startRealtimeListener: createClient', {
     url: url.slice(0, 40) + '...', keyPrefix: key.slice(0, 12),
   });
+  // Wrap fetch para volcar al log la causa real antes de que el SDK
+  // de Supabase envuelva el error y solo nos llegue "fetch failed".
+  const debugFetch: typeof fetch = async (input, init) => {
+    const target = typeof input === 'string' ? input : (input as Request).url ?? String(input);
+    try {
+      const res = await fetch(input, init);
+      return res;
+    } catch (e) {
+      const err = e as Error & { cause?: unknown; code?: string; errno?: number };
+      const causeObj = err.cause as { name?: string; message?: string; code?: string; errno?: number } | undefined;
+      diag(
+        `[fetch] FAIL ${target}: name=${err.name} message=${err.message} ` +
+        `code=${err.code ?? 'na'} errno=${err.errno ?? 'na'} ` +
+        `cause=${
+          causeObj
+            ? JSON.stringify({
+                name: causeObj.name,
+                message: causeObj.message,
+                code: causeObj.code,
+                errno: causeObj.errno,
+              })
+            : 'none'
+        }`,
+      );
+      throw e;
+    }
+  };
+
   supabase = createClient(url, key, {
+    global: { fetch: debugFetch },
     realtime: {
       // ws en main process — sin esto, realtime-js no encuentra WebSocket usable.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
