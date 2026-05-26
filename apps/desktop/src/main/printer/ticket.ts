@@ -126,10 +126,15 @@ function buildEscPosBuffer(lines: TicketLine[]): Buffer {
 async function sendRawToWindowsPrinter(printerName: string, bytes: Buffer): Promise<void> {
   // Validamos antes de gastar el Add-Type de PowerShell.
   const safeName = printerName.replace(/'/g, "''");
-  await execAsync(
-    `powershell -NoProfile -Command "Get-Printer -Name '${safeName}' -ErrorAction Stop | Out-Null"`,
-    { timeout: 5000 },
-  );
+  try {
+    await execAsync(
+      `powershell -NoProfile -Command "Get-Printer -Name '${safeName}' -ErrorAction Stop | Out-Null"`,
+      { timeout: 5000 },
+    );
+  } catch (err) {
+    const detail = extractExecError(err);
+    throw new Error(`No se encontró la impresora "${printerName}" en Windows. ${detail}`);
+  }
 
   const stamp = Date.now();
   const tmpBin = join(tmpdir(), `garum_${stamp}.bin`);
@@ -150,10 +155,24 @@ async function sendRawToWindowsPrinter(printerName: string, bytes: Buffer): Prom
         },
       },
     );
+  } catch (err) {
+    const detail = extractExecError(err);
+    throw new Error(`Spooler de Windows rechazó el envío a "${printerName}". ${detail}`);
   } finally {
     try { unlinkSync(tmpBin); } catch { /* ignorar */ }
     try { unlinkSync(tmpPs1); } catch { /* ignorar */ }
   }
+}
+
+function extractExecError(err: unknown): string {
+  const e = err as { stderr?: string; stdout?: string; message?: string };
+  const stderr = (e.stderr ?? '').toString().trim();
+  const stdout = (e.stdout ?? '').toString().trim();
+  const msg = (e.message ?? '').toString().trim();
+  // Preferimos stderr (más específico de PowerShell), luego stdout, luego message.
+  const detail = stderr || stdout || msg || 'Sin detalles del sistema.';
+  // Acortar para que quepa en alert (200 chars suelen ser suficientes).
+  return detail.length > 400 ? detail.slice(0, 400) + '…' : detail;
 }
 
 // ─── Impresión térmica ESC/POS via TCP ────────────────────────────────────────

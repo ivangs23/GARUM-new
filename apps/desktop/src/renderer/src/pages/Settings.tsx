@@ -238,6 +238,8 @@ function PrintersSection({
     } catch (err) {
       console.error('[Printer test]', err);
       setTestStates(s => ({ ...s, [printer.id]: 'error' }));
+      const msg = err instanceof Error ? err.message : String(err);
+      window.alert(`Error al imprimir en "${printer.label}":\n\n${msg}`);
     } finally {
       setTimeout(() => setTestStates(s => ({ ...s, [printer.id]: 'idle' })), 5000);
     }
