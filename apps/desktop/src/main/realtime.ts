@@ -1,6 +1,7 @@
 import { BrowserWindow, Notification } from 'electron';
 import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
 import { WebSocket } from 'ws';
+import { Agent, fetch as undiciFetch } from 'undici';
 import { join } from 'path';
 import { updateTrayStatus } from './tray';
 import { loadConfig } from './config';
@@ -13,6 +14,16 @@ import {
 } from '../shared/types';
 import { diag } from './diag';
 import { startOfTodayMadridIso, isToday, msUntilNextMidnightMadrid } from '@garum/shared/format';
+
+// undici eligió la familia IPv6 al hacer happy-eyeballs contra
+// *.supabase.co en algunas redes del local (router sin IPv6 outbound),
+// y la promesa rechazaba con un escueto "fetch failed" sin causa visible.
+// Forzar familia IPv4 hace que el handshake TLS use la ruta que sí
+// funciona — Realtime ya iba por ws y no sufría el mismo problema.
+const ipv4Dispatcher = new Agent({ connect: { family: 4 } });
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const ipv4Fetch: typeof fetch = ((url: any, init: any) =>
+  undiciFetch(url, { ...(init ?? {}), dispatcher: ipv4Dispatcher })) as any;
 
 let supabase: SupabaseClient | null = null;
 let channel: RealtimeChannel | null = null;
@@ -69,6 +80,11 @@ export async function startRealtimeListener(
     url: url.slice(0, 40) + '...', keyPrefix: key.slice(0, 12),
   });
   supabase = createClient(url, key, {
+    global: {
+      // Forzamos fetch IPv4 (ver ipv4Fetch arriba). El default de undici a
+      // veces elegía AAAA en este local y la conexión auth nunca se abría.
+      fetch: ipv4Fetch,
+    },
     realtime: {
       // ws en main process — sin esto, realtime-js no encuentra WebSocket usable.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -109,8 +125,24 @@ export async function startRealtimeListener(
     password: desktopPassword,
   });
   if (authErr) {
-    diag(`FATAL: signIn cuenta servicio desktop falló: ${authErr.message}. ` +
-         `Sin sesión válida, anon no puede reservar printed_at (RLS 014).`);
+    // authErr.message en undici suele ser "fetch failed" sin contexto.
+    // Volcamos también la causa subyacente (errno, dirección remota, etc.)
+    // que sí lleva la info útil para diagnosticar red/TLS/firewall.
+    const cause = (authErr as { cause?: unknown }).cause;
+    const causeText = cause
+      ? typeof cause === 'object' && cause !== null
+        ? JSON.stringify({
+            name: (cause as { name?: string }).name,
+            message: (cause as { message?: string }).message,
+            code: (cause as { code?: string }).code,
+            errno: (cause as { errno?: number }).errno,
+          })
+        : String(cause)
+      : 'sin causa';
+    diag(
+      `FATAL: signIn cuenta servicio desktop falló: ${authErr.message}. ` +
+      `Causa: ${causeText}. Sin sesión válida, no podemos reservar printed_at (RLS 014).`,
+    );
     sendStatus(win, 'disconnected');
     return;
   }
