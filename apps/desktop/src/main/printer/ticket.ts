@@ -19,8 +19,12 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 public class GarumRawPrinter {
+  // Class (no struct) porque StartDocPrinter recibe el parámetro como
+  // [In, MarshalAs(LPStruct)] que exige reference type. Con struct value-type
+  // PowerShell lanza "Combinación de tipos administrado y no administrado
+  // no válida" al marshallar el parámetro #3.
   [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Unicode)]
-  public struct DOCINFOA {
+  public class DOCINFOA {
     [MarshalAs(UnmanagedType.LPWStr)] public string pDocName;
     [MarshalAs(UnmanagedType.LPWStr)] public string pOutputFile;
     [MarshalAs(UnmanagedType.LPWStr)] public string pDataType;
