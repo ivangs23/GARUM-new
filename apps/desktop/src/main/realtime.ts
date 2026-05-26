@@ -95,9 +95,18 @@ const nodeFetch: typeof fetch = ((input, init) => {
             if (Array.isArray(v)) v.forEach((vv) => resHeaders.append(k, vv));
             else if (v != null) resHeaders.set(k, String(v));
           }
+          const status = res.statusCode ?? 0;
+          // WHATWG fetch: null-body status codes (101/103/204/205/304)
+          // no admiten body en el constructor de Response. Supabase REST
+          // devuelve 204 cuando un UPDATE/DELETE no usa .select(), así
+          // que pasar el buffer truena con "Invalid response status code
+          // 204" y el SDK no recibe respuesta.
+          const isNullBodyStatus =
+            status === 101 || status === 103 || status === 204 ||
+            status === 205 || status === 304;
           resolve(
-            new Response(buf, {
-              status: res.statusCode ?? 0,
+            new Response(isNullBodyStatus ? null : buf, {
+              status,
               statusText: res.statusMessage ?? '',
               headers: resHeaders,
             }),
