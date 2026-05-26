@@ -2,7 +2,7 @@ import { BrowserWindow, Notification } from 'electron';
 import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
 import { WebSocket } from 'ws';
 import { setDefaultResultOrder } from 'dns';
-import { Agent, setGlobalDispatcher } from 'undici';
+import { Agent, fetch as undiciFetch, setGlobalDispatcher } from 'undici';
 import { join } from 'path';
 import { updateTrayStatus } from './tray';
 import { loadConfig } from './config';
@@ -32,11 +32,18 @@ import { startOfTodayMadridIso, isToday, msUntilNextMidnightMadrid } from '@garu
 //     dispatcher global vive sólo en el main process y nunca sale por
 //     IPC, no choca con el clone algorithm.
 setDefaultResultOrder('ipv4first');
-// El typing del Agent de undici 6 marca `port` como requerido aunque en
-// runtime sólo aplica al opcional `connect`. Casteamos para evitar la
-// fricción TS sin perder la intención: forzar familia IPv4 en todo connect.
+
+// Crítico: Node bundlea su propio undici interno para `globalThis.fetch`,
+// que NO es el mismo objeto que el del paquete npm 'undici'. Llamar
+// `setGlobalDispatcher` aquí sólo afecta al undici de npm — el fetch
+// nativo que usa @supabase/supabase-js sigue con su dispatcher por
+// defecto, que abre AAAA y se cuelga (UND_ERR_CONNECT_TIMEOUT en el log).
+// Por eso pasamos `fetch` de undici-npm directamente al cliente Supabase
+// (ver más abajo en createClient), y aquí setGlobalDispatcher cubre el
+// caso de cualquier otra librería que use el undici-npm como fetch.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-setGlobalDispatcher(new Agent({ connect: { family: 4 } as any }));
+const ipv4Agent = new Agent({ connect: { family: 4 } as any });
+setGlobalDispatcher(ipv4Agent);
 
 let supabase: SupabaseClient | null = null;
 let channel: RealtimeChannel | null = null;
@@ -94,10 +101,14 @@ export async function startRealtimeListener(
   });
   // Wrap fetch para volcar al log la causa real antes de que el SDK
   // de Supabase envuelva el error y solo nos llegue "fetch failed".
-  const debugFetch: typeof fetch = async (input, init) => {
+  // Usamos undici-npm.fetch (no el globalThis.fetch nativo) porque ese
+  // sí honra el setGlobalDispatcher con family:4 — el global de Node
+  // usa un undici interno separado que NO podemos reconfigurar.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const debugFetch: any = async (input: any, init: any) => {
     const target = typeof input === 'string' ? input : (input as Request).url ?? String(input);
     try {
-      const res = await fetch(input, init);
+      const res = await undiciFetch(input, init);
       return res;
     } catch (e) {
       const err = e as Error & { cause?: unknown; code?: string; errno?: number };
