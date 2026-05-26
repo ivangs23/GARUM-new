@@ -2,6 +2,7 @@ import { BrowserWindow, Notification } from 'electron';
 import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
 import { WebSocket } from 'ws';
 import { setDefaultResultOrder } from 'dns';
+import { Agent, setGlobalDispatcher } from 'undici';
 import { join } from 'path';
 import { updateTrayStatus } from './tray';
 import { loadConfig } from './config';
@@ -15,14 +16,23 @@ import {
 import { diag } from './diag';
 import { startOfTodayMadridIso, isToday, msUntilNextMidnightMadrid } from '@garum/shared/format';
 
-// En el local del cliente undici hacía happy-eyeballs y elegía AAAA
-// contra *.supabase.co; la red no tiene IPv6 outbound y el auth de
-// Supabase rechazaba con un escueto "fetch failed" sin causa visible
-// (Realtime usa ws + family:0 y no sufría el mismo problema).
-// Aplicamos la prioridad IPv4 a nivel de proceso para que TODO consumo
-// de DNS dentro del main process (Supabase auth, electron-updater,
-// cualquier fetch futuro) prefiera la A sobre la AAAA.
+// El local del cliente tiene una pila IPv6 que acepta el AAAA en DNS
+// pero la salida real de paquetes IPv6 está bloqueada, así que cualquier
+// connect IPv6 se queda colgado hasta el timeout (UND_ERR_CONNECT_TIMEOUT
+// observado en garum-diag.log). Realtime usa `ws` y no sufría el problema.
+//
+// Dos cinturones para cubrirlo todo:
+//   * setDefaultResultOrder('ipv4first') reordena dns.lookup() global, por
+//     si alguna librería usa la API estándar de Node.
+//   * setGlobalDispatcher con Agent({connect:{family:4}}) fuerza a undici
+//     (el fetch nativo de Node, que es lo que usa @supabase/supabase-js)
+//     a abrir sólo sockets IPv4. Importante: NO pasamos esto vía
+//     `createClient({global:{fetch:...}})` — en v1.0.16 esa ruta provocó
+//     un "markAsUncloneable" al cruzar IPC con electron-updater. Como
+//     dispatcher global vive sólo en el main process y nunca sale por
+//     IPC, no choca con el clone algorithm.
 setDefaultResultOrder('ipv4first');
+setGlobalDispatcher(new Agent({ connect: { family: 4 } }));
 
 let supabase: SupabaseClient | null = null;
 let channel: RealtimeChannel | null = null;
