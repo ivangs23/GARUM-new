@@ -76,12 +76,15 @@ export function setupIpc(win: BrowserWindow): void {
     return scanNetworkPrinters(scanSubnet || undefined);
   });
 
-  // Imprimir ticket de prueba en una impresora concreta
+  // Imprimir ticket de prueba en una impresora concreta.
+  // El item de prueba lleva `destination` igual al destino de la impresora
+  // para que no lo filtre el routing (filterItems en buildTicketLines).
   ipcMain.handle(IPC.PRINTERS_TEST, async (_e, printerConfig: PrinterConfig) => {
+    const dest = printerConfig.destination === 'cocina' ? 'cocina' : 'barra';
     const testOrder: Order = {
       id: 'test-00000000',
       table_number: 99,
-      items: [{ id: 'test', name: 'Ticket de prueba', price: 0, quantity: 1 }],
+      items: [{ id: 'test', name: 'Ticket de prueba', price: 0, quantity: 1, destination: dest }],
       total_amount: 0,
       payment_status: 'paid',
       staff_status: 'pending',
