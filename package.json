@@ -19,6 +19,7 @@
     "desktop:release:patch": "node scripts/release-desktop.mjs patch",
     "desktop:release:minor": "node scripts/release-desktop.mjs minor",
     "desktop:release:major": "node scripts/release-desktop.mjs major",
+    "seed:test-orders": "node scripts/seed-test-orders.mjs",
     "prepare": "husky"
   },
   "devDependencies": {

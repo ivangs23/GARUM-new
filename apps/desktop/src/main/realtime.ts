@@ -264,17 +264,16 @@ async function reprintMissed(list: Order[]): Promise<void> {
       continue;
     }
     if (!data || data.length === 0) continue; // otra instancia se lo llevó
-    try {
-      await printOrder(order, printers);
-    } catch (e) {
-      diag('[Realtime] reprint failed:', e);
+    const failures = await printOrder(order, printers);
+    if (failures.length === 0) continue;
+    if (failures.length === printers.length) {
       await supabase.from('orders').update({ printed_at: null }).eq('id', order.id);
-      savedWin?.webContents.send(IPC.PRINT_ERROR, {
-        orderId: order.id,
-        mesa: order.table_number,
-        reason: e instanceof Error ? e.message : String(e),
-      });
     }
+    savedWin?.webContents.send(IPC.PRINT_ERROR, {
+      orderId: order.id,
+      mesa: order.table_number,
+      reason: failures.map(f => `${f.label}: ${f.reason}`).join(' · '),
+    });
   }
 }
 
@@ -371,7 +370,10 @@ function handleChange(order: Order, win: BrowserWindow): void {
 async function reservePrintAndDispatch(order: Order): Promise<void> {
   if (!supabase) return;
   const { printers } = loadConfig();
-  if (printers.length === 0) return;
+  if (printers.length === 0) {
+    diag('[Realtime] reservePrint: sin impresoras configuradas (loadConfig vacía).');
+    return;
+  }
 
   // Reserva: solo imprime si printed_at sigue NULL.
   const { data, error } = await supabase
@@ -386,18 +388,19 @@ async function reservePrintAndDispatch(order: Order): Promise<void> {
   }
   if (!data || data.length === 0) return; // otra instancia se llevó la impresión
 
-  try {
-    await printOrder(order, printers);
-  } catch (err) {
-    diag('[Realtime] Error al imprimir:', err);
-    // Liberar la reserva para reintentar en el próximo arranque.
+  const failures = await printOrder(order, printers);
+  if (failures.length === 0) return;
+
+  // Si TODAS las impresoras fallaron, liberar reserva para reintentar.
+  // En éxito parcial dejamos printed_at puesto: ya hay copia en alguna.
+  if (failures.length === printers.length) {
     await supabase.from('orders').update({ printed_at: null }).eq('id', order.id);
-    savedWin?.webContents.send(IPC.PRINT_ERROR, {
-      orderId: order.id,
-      mesa: order.table_number,
-      reason: err instanceof Error ? err.message : String(err),
-    });
   }
+  savedWin?.webContents.send(IPC.PRINT_ERROR, {
+    orderId: order.id,
+    mesa: order.table_number,
+    reason: failures.map(f => `${f.label}: ${f.reason}`).join(' · '),
+  });
 }
 
 // ─── Acciones ─────────────────────────────────────────────────────────────────
