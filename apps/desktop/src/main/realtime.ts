@@ -531,55 +531,43 @@ const inFlightPrints = new Set<string>();
 
 async function reservePrintAndDispatch(order: Order): Promise<void> {
   if (!supabase) return;
+  // Dedup en memoria: si ya hay un job vivo para este order, no lanzamos
+  // otro. Cubre el caso poller-vs-handleChange en el mismo proceso.
   if (inFlightPrints.has(order.id)) return;
+  // Dedup leve en DB: si el order ya viene con printed_at no-null desde
+  // Realtime/cache, asumimos que se imprimió y salimos. Multi-instancia
+  // exacta no es un caso real para este cliente; mejor evitar duplicados
+  // que pelear con races.
+  if (order.printed_at != null) return;
+
   const { printers } = loadConfig();
   if (printers.length === 0) {
     diag('[Realtime] reservePrint: sin impresoras configuradas (loadConfig vacía).');
     return;
   }
 
-  // Reserva: marca printed_at = ahora SOLO si seguía NULL. Si otra instancia
-  // (otro POS abierto) ya lo reservó, .select() devuelve vacío y salimos.
-  const { data, error } = await supabase
-    .from('orders')
-    .update({ printed_at: new Date().toISOString() })
-    .eq('id', order.id)
-    .is('printed_at', null)
-    .select('id');
-  if (error) {
-    // Antes solo se logueaba a console.error (sin volcado a fichero diag),
-    // así que en producción los fallos de RLS (típicos cuando la cuenta de
-    // servicio del desktop no está embebida en el build → se cae a anon →
-    // policy de UPDATE bloquea) eran invisibles en el log. Lo subimos a
-    // diag + lo propagamos al renderer como PRINT_ERROR para que el
-    // operador vea un banner en vez de silencio.
-    diag(`[Realtime] error reservando print orden ${order.id}: ${error.message}`);
-    savedWin?.webContents.send(IPC.PRINT_ERROR, {
-      orderId: order.id,
-      mesa: order.table_number,
-      reason: `Reserva BD: ${error.message}`,
-    });
-    return;
-  }
-  if (!data || data.length === 0) {
-    diag(`[Realtime] reserva sin filas para orden ${order.id} — ya estaba impresa o sin permisos.`);
-    return;
-  }
-
   inFlightPrints.add(order.id);
   try {
     const failures = await printOrder(order, printers);
-    if (failures.length === 0) return;
 
-    // Si CUALQUIER impresora aplicable al pedido falló, liberar reserva para
-    // reintentar en el siguiente poll. Asumimos que el ticket es idempotente
-    // a nivel humano (un cocinero ve dos tickets iguales y cocina una vez).
-    // Mejor reimprimir de más que perder un pedido.
-    await supabase.from('orders').update({ printed_at: null }).eq('id', order.id);
-    // Refleja en cache la liberación para que el poller lo vea.
-    const cached = orders.get(order.id);
-    if (cached) orders.set(order.id, { ...cached, printed_at: null });
+    if (failures.length === 0) {
+      // Print OK → marcamos printed_at AHORA (no antes). Si la UPDATE
+      // falla, el poller lo reintentará la próxima vuelta (printed_at
+      // sigue NULL en cache y DB).
+      const { error: markErr } = await supabase
+        .from('orders')
+        .update({ printed_at: new Date().toISOString() })
+        .eq('id', order.id);
+      if (markErr) {
+        diag(`[Realtime] error marcando printed_at orden ${order.id}: ${markErr.message}`);
+        return;
+      }
+      const cached = orders.get(order.id);
+      if (cached) orders.set(order.id, { ...cached, printed_at: new Date().toISOString() });
+      return;
+    }
 
+    // Print falló — el poller volverá a intentarlo. NO marcamos printed_at.
     savedWin?.webContents.send(IPC.PRINT_ERROR, {
       orderId: order.id,
       mesa: order.table_number,
