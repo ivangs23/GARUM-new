@@ -15,6 +15,7 @@ export default function App() {
     message: '',
   });
   const [appVersion, setAppVersion] = useState<string>('');
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
 
   useEffect(() => {
     // Pull: traer el estado actual al montar (cubre el caso de force-reload,
@@ -98,8 +99,36 @@ export default function App() {
             </span>
           </div>
           {appVersion && (
-            <div style={{ fontSize: '0.68rem', color: 'var(--muted)', opacity: 0.7 }}>
-              v{appVersion}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '0.4rem',
+              fontSize: '0.68rem', color: 'var(--muted)', opacity: 0.85,
+            }}>
+              <span>v{appVersion}</span>
+              <button
+                onClick={async () => {
+                  if (checkingUpdate) return;
+                  setCheckingUpdate(true);
+                  try {
+                    await window.api.checkForUpdate();
+                  } finally {
+                    setCheckingUpdate(false);
+                  }
+                }}
+                disabled={checkingUpdate}
+                title="Buscar actualización"
+                style={{
+                  background: 'none',
+                  border: '1px solid var(--border)',
+                  borderRadius: 3,
+                  color: 'inherit',
+                  fontSize: '0.62rem',
+                  padding: '1px 6px',
+                  cursor: checkingUpdate ? 'wait' : 'pointer',
+                  lineHeight: 1.4,
+                }}
+              >
+                {checkingUpdate ? 'Buscando…' : 'Buscar update'}
+              </button>
             </div>
           )}
         </div>
