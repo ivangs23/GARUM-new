@@ -230,6 +230,20 @@ function extractExecError(err: unknown): string {
 }
 
 // ─── Impresión térmica ESC/POS via TCP ────────────────────────────────────────
+//
+// Patrón calcado del agente v2 (proyecto agente-impresora-v2,
+// src/printer-service.js → imprimirEn):
+//   - NO llamamos a isPrinterConnected() previamente: la mayoría de
+//     impresoras térmicas en puerto 9100 sólo aceptan una conexión TCP
+//     a la vez y, si abrimos un socket de "ping" justo antes del
+//     execute(), la impresora todavía no ha cerrado el primero y el
+//     segundo intento de conexión rechaza. Síntoma observado: "el
+//     ticket a veces sale, a veces no".
+//   - Reintentamos hasta MAX_TRIES con back-off. Mismo número de
+//     intentos y delay que el agente v2 (3 × 2 s).
+
+const TCP_MAX_TRIES = 3;
+const TCP_RETRY_DELAY_MS = 2000;
 
 async function printThermalTicket(order: Order, printerConfig: PrinterConfig): Promise<void> {
   const destination = printerConfig.destination as TicketDestination;
@@ -246,24 +260,37 @@ async function printThermalTicket(order: Order, printerConfig: PrinterConfig): P
 
   const iface = `tcp://${printerConfig.host}:${printerConfig.port ?? 9100}`;
 
-  const printer = new ThermalPrinter({
-    type: PrinterTypes.EPSON,
-    interface: iface,
-    characterSet: CharacterSet.PC858_EURO,
-    removeSpecialCharacters: false,
-    options: { timeout: 5000 },
-  });
+  let lastErr: unknown = null;
+  for (let attempt = 1; attempt <= TCP_MAX_TRIES; attempt++) {
+    // Una instancia nueva por intento: si el anterior dejó bytes a
+    // medias en el buffer interno, no contaminamos el siguiente envío.
+    const printer = new ThermalPrinter({
+      type: PrinterTypes.EPSON,
+      interface: iface,
+      characterSet: CharacterSet.PC858_EURO,
+      removeSpecialCharacters: false,
+      options: { timeout: 5000 },
+    });
 
-  const connected = await printer.isPrinterConnected();
-  if (!connected) {
-    throw new Error(`Impresora no accesible: ${printerConfig.label} (${iface})`);
+    try {
+      for (const line of lines) {
+        emitLine(printer, line);
+      }
+      await printer.execute();
+      return; // éxito
+    } catch (err) {
+      lastErr = err;
+      try { printer.clear(); } catch { /* ignorar */ }
+      if (attempt < TCP_MAX_TRIES) {
+        await sleep(TCP_RETRY_DELAY_MS);
+      }
+    }
   }
 
-  for (const line of lines) {
-    emitLine(printer, line);
-  }
-
-  await printer.execute();
+  const detail = lastErr instanceof Error ? lastErr.message : String(lastErr);
+  throw new Error(
+    `Impresora "${printerConfig.label}" (${iface}) no respondió tras ${TCP_MAX_TRIES} intentos: ${detail}`,
+  );
 }
 
 function emitLine(printer: ThermalPrinter, line: TicketLine): void {

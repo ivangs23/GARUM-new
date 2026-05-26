@@ -16,9 +16,9 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // ── EDITA ESTO ────────────────────────────────────────────────────────────
-const MESA = 7;          // Número de mesa
-const COCINA_COUNT = 3;  // Cuántos productos de cocina llevar
-const BARRA_COUNT = 2;   // Cuántos productos de barra llevar
+const MESA = 5; // Número de mesa
+const COCINA_COUNT = 3; // Cuántos productos de cocina llevar
+const BARRA_COUNT = 2; // Cuántos productos de barra llevar
 // ──────────────────────────────────────────────────────────────────────────
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -36,7 +36,10 @@ function loadEnv(path) {
     const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
     if (!m) continue;
     let v = m[2].trim();
-    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+    if (
+      (v.startsWith('"') && v.endsWith('"')) ||
+      (v.startsWith("'") && v.endsWith("'"))
+    ) {
       v = v.slice(1, -1);
     }
     out[m[1]] = v;
@@ -78,7 +81,9 @@ async function main() {
     name: p.name,
     price: Number(p.price),
     destination:
-      p.category && typeof p.category === "object" && "destination" in p.category
+      p.category &&
+      typeof p.category === "object" &&
+      "destination" in p.category
         ? p.category.destination
         : null,
   }));
@@ -87,25 +92,39 @@ async function main() {
   const barraPool = all.filter((p) => p.destination === "barra");
 
   if (cocinaPool.length < COCINA_COUNT) {
-    throw new Error(`Solo hay ${cocinaPool.length} productos de cocina (necesitas ${COCINA_COUNT}).`);
+    throw new Error(
+      `Solo hay ${cocinaPool.length} productos de cocina (necesitas ${COCINA_COUNT}).`,
+    );
   }
   if (barraPool.length < BARRA_COUNT) {
-    throw new Error(`Solo hay ${barraPool.length} productos de barra (necesitas ${BARRA_COUNT}).`);
+    throw new Error(
+      `Solo hay ${barraPool.length} productos de barra (necesitas ${BARRA_COUNT}).`,
+    );
   }
 
   const items = [
     ...pick(cocinaPool, COCINA_COUNT).map((p) => ({
-      id: p.id, name: p.name, price: p.price, quantity: 1, destination: "cocina",
+      id: p.id,
+      name: p.name,
+      price: p.price,
+      quantity: 1,
+      destination: "cocina",
     })),
     ...pick(barraPool, BARRA_COUNT).map((p) => ({
-      id: p.id, name: p.name, price: p.price, quantity: 1, destination: "barra",
+      id: p.id,
+      name: p.name,
+      price: p.price,
+      quantity: 1,
+      destination: "barra",
     })),
   ];
 
   const order = {
     table_number: MESA,
     items,
-    total_amount: Number(items.reduce((a, it) => a + it.price * it.quantity, 0).toFixed(2)),
+    total_amount: Number(
+      items.reduce((a, it) => a + it.price * it.quantity, 0).toFixed(2),
+    ),
     payment_status: "paid",
     stripe_session_id: `test_mixed_${Date.now()}`,
     staff_status_kitchen: COCINA_COUNT > 0 ? "pending" : "na",
@@ -113,11 +132,24 @@ async function main() {
   };
 
   console.log(`\nInsertando mesa=${MESA} total=${order.total_amount}€`);
-  console.log(`  Cocina (${COCINA_COUNT}): ${items.filter(i => i.destination === "cocina").map(i => i.name).join(", ")}`);
-  console.log(`  Barra (${BARRA_COUNT}):  ${items.filter(i => i.destination === "barra").map(i => i.name).join(", ")}`);
+  console.log(
+    `  Cocina (${COCINA_COUNT}): ${items
+      .filter((i) => i.destination === "cocina")
+      .map((i) => i.name)
+      .join(", ")}`,
+  );
+  console.log(
+    `  Barra (${BARRA_COUNT}):  ${items
+      .filter((i) => i.destination === "barra")
+      .map((i) => i.name)
+      .join(", ")}`,
+  );
 
   const { data: ins, error: insErr } = await supabase
-    .from("orders").insert(order).select("id").single();
+    .from("orders")
+    .insert(order)
+    .select("id")
+    .single();
   if (insErr) {
     console.error("\n✗ Error:", insErr.message);
     process.exit(1);
@@ -126,4 +158,7 @@ async function main() {
   console.log("\nDebería salir 1 ticket en cocina + 1 ticket en barra.");
 }
 
-main().catch((e) => { console.error("Error fatal:", e); process.exit(1); });
+main().catch((e) => {
+  console.error("Error fatal:", e);
+  process.exit(1);
+});
