@@ -152,10 +152,28 @@ function buildEscPosBuffer(lines: TicketLine[]): Buffer {
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
+// Estados de PrinterStatus que indican un fallo real que el operador debe
+// arreglar antes de imprimir. El resto (Normal/Idle/Printing/Processing/
+// Busy/Waiting/IoActive…) son transitorios y dejamos pasar — winspool
+// encolará el RAW y el retry resuelve si quedó atascado.
+const HARD_PRINTER_FAILURE_STATES = new Set([
+  'Offline',
+  'Error',
+  'Paused',
+  'PaperOut',
+  'PaperJam',
+  'DoorOpen',
+  'NoToner',
+  'OutputBinFull',
+  'NotAvailable',
+  'UserInterventionRequired',
+  'ServerUnknown',
+]);
+
 async function sendRawToWindowsPrinter(printerName: string, bytes: Buffer): Promise<void> {
-  // Verifica existencia + estado online antes de gastar el Add-Type.
-  // PrinterStatus 'Normal' o 'Idle' = OK; cualquier otro (Offline,
-  // PaperOut, Paused, Error, Jammed) lo reportamos.
+  // Verifica existencia + rechaza sólo estados duros. Estados "ocupado"
+  // (Printing, Processing, Busy, IoActive, Waiting) son normales justo
+  // después del job anterior — no hay que tirar el envío por eso.
   const safeName = printerName.replace(/'/g, "''");
   try {
     const { stdout } = await execAsync(
@@ -163,14 +181,12 @@ async function sendRawToWindowsPrinter(printerName: string, bytes: Buffer): Prom
       { timeout: 5000 },
     );
     const status = stdout.trim();
-    if (status && status !== 'Normal' && status !== 'Idle') {
+    if (status && HARD_PRINTER_FAILURE_STATES.has(status)) {
       throw new Error(
         `Impresora "${printerName}" no disponible (estado="${status}"). Revisa papel/tapa/conexión.`,
       );
     }
   } catch (err) {
-    // Si el error ya viene formateado por arriba, propágalo. Si es el exec
-    // el que falló (Get-Printer no encontró el dispositivo), enriquece.
     if (err instanceof Error && err.message.startsWith('Impresora ')) throw err;
     const detail = extractExecError(err);
     throw new Error(`No se encontró la impresora "${printerName}" en Windows. ${detail}`);
