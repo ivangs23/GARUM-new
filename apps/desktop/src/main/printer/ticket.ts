@@ -6,6 +6,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import type { Order, PrinterConfig } from '../../shared/types';
 import { buildTicketLines, type TicketDestination, type TicketLine } from '@garum/shared/ticket';
+import { diag } from '../diag';
 
 const execAsync = promisify(exec);
 
@@ -127,10 +128,17 @@ async function printWindowsTicket(order: Order, config: PrinterConfig): Promise<
   const lines = buildTicketLines(order, destination);
 
   const hasItemLines = lines.some(l => l.kind === 'text' && /^\d+x  /.test(l.text));
-  if (!hasItemLines) return;
+  if (!hasItemLines) {
+    diag(`[Printer] skip "${printerName}" — sin items para destino ${destination}`);
+    return;
+  }
 
   const buffer = buildEscPosBuffer(lines);
+  diag(
+    `[Printer] enviando a "${printerName}" — orden ${order.id} mesa ${order.table_number} bytes=${buffer.length}`,
+  );
   await sendRawToWindowsPrinter(printerName, buffer);
+  diag(`[Printer] OK "${printerName}" — orden ${order.id} mesa ${order.table_number}`);
 }
 
 function buildEscPosBuffer(lines: TicketLine[]): Buffer {
