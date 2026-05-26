@@ -2,7 +2,8 @@ import { BrowserWindow, Notification } from 'electron';
 import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
 import { WebSocket } from 'ws';
 import { setDefaultResultOrder } from 'dns';
-import { Agent, fetch as undiciFetch, setGlobalDispatcher } from 'undici';
+import { request as httpsRequest } from 'https';
+import { request as httpRequest } from 'http';
 import { join } from 'path';
 import { updateTrayStatus } from './tray';
 import { loadConfig } from './config';
@@ -16,34 +17,103 @@ import {
 import { diag } from './diag';
 import { startOfTodayMadridIso, isToday, msUntilNextMidnightMadrid } from '@garum/shared/format';
 
-// El local del cliente tiene una pila IPv6 que acepta el AAAA en DNS
-// pero la salida real de paquetes IPv6 está bloqueada, así que cualquier
-// connect IPv6 se queda colgado hasta el timeout (UND_ERR_CONNECT_TIMEOUT
-// observado en garum-diag.log). Realtime usa `ws` y no sufría el problema.
-//
-// Dos cinturones para cubrirlo todo:
-//   * setDefaultResultOrder('ipv4first') reordena dns.lookup() global, por
-//     si alguna librería usa la API estándar de Node.
-//   * setGlobalDispatcher con Agent({connect:{family:4}}) fuerza a undici
-//     (el fetch nativo de Node, que es lo que usa @supabase/supabase-js)
-//     a abrir sólo sockets IPv4. Importante: NO pasamos esto vía
-//     `createClient({global:{fetch:...}})` — en v1.0.16 esa ruta provocó
-//     un "markAsUncloneable" al cruzar IPC con electron-updater. Como
-//     dispatcher global vive sólo en el main process y nunca sale por
-//     IPC, no choca con el clone algorithm.
 setDefaultResultOrder('ipv4first');
 
-// Crítico: Node bundlea su propio undici interno para `globalThis.fetch`,
-// que NO es el mismo objeto que el del paquete npm 'undici'. Llamar
-// `setGlobalDispatcher` aquí sólo afecta al undici de npm — el fetch
-// nativo que usa @supabase/supabase-js sigue con su dispatcher por
-// defecto, que abre AAAA y se cuelga (UND_ERR_CONNECT_TIMEOUT en el log).
-// Por eso pasamos `fetch` de undici-npm directamente al cliente Supabase
-// (ver más abajo en createClient), y aquí setGlobalDispatcher cubre el
-// caso de cualquier otra librería que use el undici-npm como fetch.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const ipv4Agent = new Agent({ connect: { family: 4 } as any });
-setGlobalDispatcher(ipv4Agent);
+/**
+ * Fetch shim sobre node:https/http con `family: 4` forzado.
+ *
+ * Razón histórica (v1.0.16 → v1.0.22): el local del cliente tiene pila
+ * IPv6 que resuelve AAAA pero la red bloquea paquetes IPv6 outbound, así
+ * que cualquier connect IPv6 se cuelga 10 s y termina en
+ * UND_ERR_CONNECT_TIMEOUT. Intentamos atajarlo con:
+ *   - setDefaultResultOrder('ipv4first') → undici interno lo ignora.
+ *   - setGlobalDispatcher(Agent({connect:{family:4}})) → solo afecta al
+ *     undici-npm, no al undici interno que usa globalThis.fetch.
+ *   - undici 8 → revienta en Electron 33 (Node 20) con
+ *     webidl.util.markAsUncloneable.
+ *   - undici 6 + global.fetch override → Agent.connect.family no se
+ *     aplica realmente, el timeout persiste.
+ *
+ * Nuclear option: hacemos las peticiones nosotros con node:https/http,
+ * pasamos `family: 4` directo a net.connect y devolvemos un `Response`
+ * estándar que cumple la interfaz que espera @supabase/supabase-js.
+ * Sin deps externas, comportamiento determinista.
+ */
+const nodeFetch: typeof fetch = ((input, init) => {
+  const init0 = init ?? {};
+  const targetUrl =
+    typeof input === 'string'
+      ? input
+      : input instanceof URL
+        ? input.toString()
+        : (input as Request).url;
+  const url = new URL(targetUrl);
+  const isHttps = url.protocol === 'https:';
+  const reqFn = isHttps ? httpsRequest : httpRequest;
+
+  // Headers → objeto plano que node:http acepta.
+  const headersObj: Record<string, string> = {};
+  if (init0.headers) {
+    const h = init0.headers;
+    if (h instanceof Headers) {
+      h.forEach((v, k) => { headersObj[k] = v; });
+    } else if (Array.isArray(h)) {
+      for (const [k, v] of h) headersObj[k] = v;
+    } else {
+      Object.assign(headersObj, h as Record<string, string>);
+    }
+  }
+
+  // Body normalizado a Buffer/string.
+  let bodyBuf: Buffer | string | undefined;
+  if (init0.body != null) {
+    if (typeof init0.body === 'string') bodyBuf = init0.body;
+    else if (init0.body instanceof Buffer) bodyBuf = init0.body;
+    else if (init0.body instanceof Uint8Array) bodyBuf = Buffer.from(init0.body);
+    else if (init0.body instanceof ArrayBuffer) bodyBuf = Buffer.from(init0.body);
+    else bodyBuf = String(init0.body);
+  }
+
+  return new Promise<Response>((resolve, reject) => {
+    const req = reqFn(
+      {
+        hostname: url.hostname,
+        port: url.port ? Number(url.port) : isHttps ? 443 : 80,
+        path: url.pathname + url.search,
+        method: init0.method ?? 'GET',
+        headers: headersObj,
+        family: 4, // ← el motivo de todo este shim
+        timeout: 30_000,
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (c: Buffer) => chunks.push(c));
+        res.on('end', () => {
+          const buf = Buffer.concat(chunks);
+          const resHeaders = new Headers();
+          for (const [k, v] of Object.entries(res.headers)) {
+            if (Array.isArray(v)) v.forEach((vv) => resHeaders.append(k, vv));
+            else if (v != null) resHeaders.set(k, String(v));
+          }
+          resolve(
+            new Response(buf, {
+              status: res.statusCode ?? 0,
+              statusText: res.statusMessage ?? '',
+              headers: resHeaders,
+            }),
+          );
+        });
+        res.on('error', reject);
+      },
+    );
+    req.on('error', reject);
+    req.on('timeout', () => {
+      req.destroy(new Error(`node-fetch timeout ${url.hostname}`));
+    });
+    if (bodyBuf != null) req.write(bodyBuf);
+    req.end();
+  });
+}) as typeof fetch;
 
 let supabase: SupabaseClient | null = null;
 let channel: RealtimeChannel | null = null;
@@ -99,16 +169,13 @@ export async function startRealtimeListener(
   diag('startRealtimeListener: createClient', {
     url: url.slice(0, 40) + '...', keyPrefix: key.slice(0, 12),
   });
-  // Wrap fetch para volcar al log la causa real antes de que el SDK
+  // Wrap nodeFetch para volcar al log la causa real antes de que el SDK
   // de Supabase envuelva el error y solo nos llegue "fetch failed".
-  // Usamos undici-npm.fetch (no el globalThis.fetch nativo) porque ese
-  // sí honra el setGlobalDispatcher con family:4 — el global de Node
-  // usa un undici interno separado que NO podemos reconfigurar.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const debugFetch: any = async (input: any, init: any) => {
     const target = typeof input === 'string' ? input : (input as Request).url ?? String(input);
     try {
-      const res = await undiciFetch(input, init);
+      const res = await nodeFetch(input, init);
       return res;
     } catch (e) {
       const err = e as Error & { cause?: unknown; code?: string; errno?: number };
