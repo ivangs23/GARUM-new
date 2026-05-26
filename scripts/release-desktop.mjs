@@ -36,7 +36,7 @@ const next =
   bump === 'minor' ? `${maj}.${min + 1}.0` :
                      `${maj}.${min}.${pat + 1}`;
 
-const tag = `desktop-v${next}`;
+const tag = `v${next}`;
 
 if (shOut(`git tag --list ${tag}`)) {
   console.error(`Tag ${tag} already exists locally. Aborting.`);
@@ -51,7 +51,7 @@ writeFileSync(PKG_PATH, JSON.stringify(pkg, null, 2) + '\n');
 
 sh('git add apps/desktop/package.json');
 sh(`git commit -m "chore(desktop): release ${tag}"`);
-sh(`git tag -a ${tag} -m "Desktop release ${tag}"`);
+sh(`git tag -a ${tag} -m "Garum Desktop ${tag}"`);
 sh('git push origin HEAD');
 sh(`git push origin ${tag}`);
 

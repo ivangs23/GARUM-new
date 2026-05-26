@@ -3,7 +3,7 @@ name: Desktop Release (Windows)
 on:
   push:
     tags:
-      - "desktop-v*"
+      - "v*"
   workflow_dispatch:
 
 permissions:
