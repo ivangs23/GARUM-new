@@ -1,11 +1,11 @@
 import { app, BrowserWindow } from 'electron';
-import { autoUpdater }        from 'electron-updater';
 import { createMainWindow }   from './window';
 import { createTray }         from './tray';
 import { setupIpc }           from './ipc';
 import { startRealtimeListener, stopRealtimeListener } from './realtime';
 import { loadConfig }         from './config';
 import { diag }               from './diag';
+import { setupUpdater }       from './updater';
 
 // AppUserModelId — necesario en Windows para que las notificaciones
 // muestren el icono y el nombre correctos en vez del de Electron.
@@ -52,17 +52,13 @@ app.whenReady().then(async () => {
     await startRealtimeListener(config.supabaseUrl, config.supabaseKey, mainWindow);
   }
 
-  // Auto-update: comprobar GitHub Releases al arrancar (omitir en E2E y dev)
-  if (!isE2E && app.isPackaged) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    autoUpdater.logger = { info: (m: unknown) => diag('[updater]', m), warn: (m: unknown) => diag('[updater] WARN', m), error: (m: unknown) => diag('[updater] ERROR', m), debug: (_m: unknown) => {} } as any;
-    autoUpdater.autoDownload = true;
-    autoUpdater.autoInstallOnAppQuit = true;
-    autoUpdater.on('update-available',   (info) => diag('[updater] update available:', info.version));
-    autoUpdater.on('update-downloaded',  (info) => diag('[updater] update downloaded — se instalará al cerrar:', info.version));
-    autoUpdater.on('error',              (err)  => diag('[updater] error:', err.message));
-    autoUpdater.checkForUpdates().catch((err) => diag('[updater] checkForUpdates error:', err.message));
-  }
+  // Auto-update: el módulo updater emite estado al renderer (banner UI) y
+  // sigue auto-instalando al cerrar como red de seguridad. En dev/E2E se
+  // marca como 'disabled' para que el banner muestre el motivo.
+  setupUpdater(mainWindow, {
+    disabled: isE2E || !app.isPackaged,
+    reason: isE2E ? 'E2E test mode' : 'modo desarrollo',
+  });
 });
 
 // Segunda instancia → traer ventana al frente

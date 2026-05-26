@@ -65,6 +65,27 @@ export type MaintenanceState = {
   message: string;
 };
 
+/**
+ * Estado del autoupdater publicado del main al renderer. El renderer lo
+ * pinta como banner persistente para que el usuario sepa que la app está
+ * comprobando/descargando/lista para reiniciar.
+ */
+export type UpdaterStatus =
+  | { kind: 'idle' }
+  | { kind: 'disabled'; reason: string }
+  | { kind: 'checking' }
+  | { kind: 'not-available'; version: string }
+  | { kind: 'available'; version: string }
+  | {
+      kind: 'downloading';
+      version: string;
+      percent: number;
+      transferred: number;
+      total: number;
+    }
+  | { kind: 'downloaded'; version: string }
+  | { kind: 'error'; message: string };
+
 // IPC channels — fuente única de verdad para evitar typos
 export const IPC = {
   ORDERS_GET:              'orders:get',
@@ -84,4 +105,9 @@ export const IPC = {
   MAINTENANCE_GET:         'maintenance:get',
   MAINTENANCE_CHANGED:     'maintenance:changed',
   PRINT_ERROR:             'print:error',
+  APP_VERSION:             'app:version',
+  UPDATER_STATUS:          'updater:status',
+  UPDATER_GET:             'updater:get',
+  UPDATER_CHECK:           'updater:check',
+  UPDATER_INSTALL:         'updater:install',
 } as const;

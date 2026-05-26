@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Orders  from './pages/Orders';
 import Settings from './pages/Settings';
 import History from './pages/History';
+import UpdateBanner from './components/UpdateBanner';
 import { IPC, type MaintenanceState } from '../../shared/types';
 
 type Page = 'orders' | 'history' | 'settings';
@@ -13,12 +14,14 @@ export default function App() {
     enabled: false,
     message: '',
   });
+  const [appVersion, setAppVersion] = useState<string>('');
 
   useEffect(() => {
     // Pull: traer el estado actual al montar (cubre el caso de force-reload,
     // donde el push pasado se perdió porque el renderer aún no estaba listo).
     window.api.getConnectionStatus().then(setStatus);
     window.api.getMaintenance().then(setMaintenance);
+    window.api.getAppVersion().then(setAppVersion);
     // Push: recibir cambios futuros.
     window.api.onConnectionStatus(setStatus);
     window.api.onMaintenanceChanged(setMaintenance);
@@ -78,25 +81,33 @@ export default function App() {
           ))}
         </nav>
 
-        {/* Estado de conexión */}
+        {/* Estado de conexión + versión */}
         <div style={{
           padding: '0.75rem 1.2rem', borderTop: '1px solid var(--border)',
-          display: 'flex', alignItems: 'center', gap: '0.5rem',
+          display: 'flex', flexDirection: 'column', gap: '0.4rem',
         }}>
-          <span style={{
-            width: 8, height: 8, borderRadius: '50%',
-            background: statusColor[status] ?? 'var(--muted)',
-            animation: status === 'connected' ? 'pulse 2s infinite' : 'none',
-            flexShrink: 0,
-          }} />
-          <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>
-            {statusLabel[status] ?? status}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{
+              width: 8, height: 8, borderRadius: '50%',
+              background: statusColor[status] ?? 'var(--muted)',
+              animation: status === 'connected' ? 'pulse 2s infinite' : 'none',
+              flexShrink: 0,
+            }} />
+            <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>
+              {statusLabel[status] ?? status}
+            </span>
+          </div>
+          {appVersion && (
+            <div style={{ fontSize: '0.68rem', color: 'var(--muted)', opacity: 0.7 }}>
+              v{appVersion}
+            </div>
+          )}
         </div>
       </aside>
 
       {/* Contenido */}
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <UpdateBanner />
         {maintenance.enabled && (
           <div style={{
             background: 'rgba(251,146,60,0.1)',

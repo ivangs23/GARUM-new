@@ -6,6 +6,7 @@ import type {
   PrinterConfig,
   DiscoveredPrinter,
   MaintenanceState,
+  UpdaterStatus,
 } from '../../shared/types';
 
 declare global {
@@ -31,6 +32,11 @@ declare global {
       listHistory:          (limit: number, offset: number) => Promise<Order[]>;
       getConnectionStatus:  ()                          => Promise<string>;
       getMaintenance:       ()                          => Promise<MaintenanceState>;
+      getAppVersion:        ()                          => Promise<string>;
+      getUpdaterStatus:     ()                          => Promise<UpdaterStatus>;
+      checkForUpdate:       ()                          => Promise<void>;
+      installUpdate:        ()                          => Promise<void>;
+      onUpdaterStatus:      (cb: (s: UpdaterStatus) => void) => void;
     };
   }
 }

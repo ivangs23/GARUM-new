@@ -6,6 +6,7 @@ import {
   type PrinterConfig,
   type DiscoveredPrinter,
   type MaintenanceState,
+  type UpdaterStatus,
 } from '../shared/types';
 
 // API expuesta al renderer a través de contextBridge.
@@ -78,6 +79,22 @@ const api = {
 
   getMaintenance: (): Promise<MaintenanceState> =>
     ipcRenderer.invoke(IPC.MAINTENANCE_GET),
+
+  // ── Versión / Autoupdater ─────────────────────────────────────────────────
+  getAppVersion: (): Promise<string> =>
+    ipcRenderer.invoke(IPC.APP_VERSION),
+
+  getUpdaterStatus: (): Promise<UpdaterStatus> =>
+    ipcRenderer.invoke(IPC.UPDATER_GET),
+
+  checkForUpdate: (): Promise<void> =>
+    ipcRenderer.invoke(IPC.UPDATER_CHECK),
+
+  installUpdate: (): Promise<void> =>
+    ipcRenderer.invoke(IPC.UPDATER_INSTALL),
+
+  onUpdaterStatus: (cb: (status: UpdaterStatus) => void) =>
+    ipcRenderer.on(IPC.UPDATER_STATUS, (_e, v) => cb(v)),
 };
 
 contextBridge.exposeInMainWorld('api', api);

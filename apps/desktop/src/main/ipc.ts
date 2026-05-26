@@ -1,4 +1,4 @@
-import { ipcMain, BrowserWindow } from 'electron';
+import { app, ipcMain, BrowserWindow } from 'electron';
 import {
   getOrders,
   markOrderDone,
@@ -10,6 +10,11 @@ import {
 import { loadConfig, saveConfig } from './config';
 import { printOrderTicket, listWindowsPrinters, scanNetworkPrinters } from './printer';
 import { listHistory } from './history';
+import {
+  checkForUpdateNow,
+  getUpdaterStatus,
+  installUpdateNow,
+} from './updater';
 import {
   IPC,
   type AppConfig,
@@ -98,4 +103,12 @@ export function setupIpc(win: BrowserWindow): void {
 
   // ── Mantenimiento ─────────────────────────────────────────────────────────
   ipcMain.handle(IPC.MAINTENANCE_GET, () => getMaintenance());
+
+  // ── App / Actualizaciones ─────────────────────────────────────────────────
+  ipcMain.handle(IPC.APP_VERSION, () => app.getVersion());
+  ipcMain.handle(IPC.UPDATER_GET, () => getUpdaterStatus());
+  ipcMain.handle(IPC.UPDATER_CHECK, () => checkForUpdateNow());
+  ipcMain.handle(IPC.UPDATER_INSTALL, () => {
+    installUpdateNow();
+  });
 }
