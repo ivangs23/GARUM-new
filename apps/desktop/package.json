@@ -1,6 +1,6 @@
 {
   "name": "garum-desktop",
-  "version": "1.0.25",
+  "version": "1.0.26",
   "description": "Panel de comandas y gestión de impresoras — Garum Vinoteca",
   "author": "Garum Vinoteca",
   "main": "out/main/index.js",
