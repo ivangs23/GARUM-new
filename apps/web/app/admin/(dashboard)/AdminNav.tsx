@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Tag, UtensilsCrossed, QrCode, LogOut, ArrowLeft, X, Settings } from 'lucide-react';
+import { LayoutDashboard, Tag, UtensilsCrossed, QrCode, LogOut, ArrowLeft, X, Settings, Activity } from 'lucide-react';
 import { supabaseBrowser } from '@/lib/supabase-browser';
 
 const links = [
@@ -11,6 +11,7 @@ const links = [
   { href: '/admin/categories', label: 'Categorías',    icon: Tag,             exact: false },
   { href: '/admin/products',   label: 'Productos',     icon: UtensilsCrossed, exact: false },
   { href: '/admin/qr',         label: 'QR Mesas',      icon: QrCode,          exact: false },
+  { href: '/admin/health',     label: 'Salud local',   icon: Activity,        exact: false },
   { href: '/admin/settings',   label: 'Configuración', icon: Settings,        exact: false },
 ];
 

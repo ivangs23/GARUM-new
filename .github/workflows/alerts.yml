@@ -1,0 +1,36 @@
+name: Order alerts
+
+# Dispara el comprobador de alertas de la web cada 10 minutos. Portable y
+# gratis (no depende del plan de Vercel) y holgado dentro de los 2000 min/mes
+# gratis de Actions en repos privados. Alternativa: Vercel Cron en vercel.json
+# (requiere plan Pro para cadencia < 1 día).
+#
+# Secrets del repositorio necesarios:
+#   ALERTS_ENDPOINT  → https://<tu-dominio>/api/alerts/check
+#   CRON_SECRET      → el mismo valor configurado en las env de Vercel
+#
+# Nota: los crons de GitHub Actions pueden retrasarse unos minutos bajo carga;
+# la cadencia efectiva es aproximada, suficiente para avisar en pocos minutos.
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {} # permite lanzarlo a mano desde la pestaña Actions
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping alert checker
+        env:
+          ALERTS_ENDPOINT: ${{ secrets.ALERTS_ENDPOINT }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$ALERTS_ENDPOINT" ]; then
+            echo "ALERTS_ENDPOINT no configurado — saltando."; exit 0
+          fi
+          code=$(curl -sS -o /tmp/out -w "%{http_code}" -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "$ALERTS_ENDPOINT")
+          echo "HTTP $code"; cat /tmp/out; echo
+          test "$code" = "200"

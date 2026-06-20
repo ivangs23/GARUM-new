@@ -1,8 +1,8 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, powerMonitor } from 'electron';
 import { createMainWindow }   from './window';
 import { createTray }         from './tray';
 import { setupIpc }           from './ipc';
-import { startRealtimeListener, stopRealtimeListener } from './realtime';
+import { startRealtimeListener, stopRealtimeListener, reconnect, getConnectionStatus } from './realtime';
 import { loadConfig }         from './config';
 import { diag }               from './diag';
 import { setupUpdater }       from './updater';
@@ -50,6 +50,23 @@ app.whenReady().then(async () => {
   // marca 'disconnected' por sí mismo para que la UI no se quede en "Conectando".
   if (!isE2E) {
     await startRealtimeListener(config.supabaseUrl, config.supabaseKey, mainWindow);
+
+    // Suspensión/reanudación del PC: al dormir, el WebSocket queda medio-abierto
+    // (TCP half-open) y los timers se congelan; al despertar podríamos tardar
+    // en detectar que el canal está muerto. Forzamos una reconexión limpia en
+    // `resume` (que re-ejecuta loadInitialOrders → backfill inmediato) en vez de
+    // esperar al heartbeat-timeout. Cubre el local que suspende por la noche.
+    powerMonitor.on('resume', () => {
+      diag('powerMonitor: resume — forzando reconexión');
+      if (mainWindow && !mainWindow.isDestroyed()) void reconnect(mainWindow);
+    });
+    powerMonitor.on('unlock-screen', () => {
+      if (getConnectionStatus() !== 'connected') {
+        diag('powerMonitor: unlock-screen y no conectado — forzando reconexión');
+        if (mainWindow && !mainWindow.isDestroyed()) void reconnect(mainWindow);
+      }
+    });
+    powerMonitor.on('suspend', () => { diag('powerMonitor: suspend (PC durmiendo)'); });
   }
 
   // Auto-update: el módulo updater emite estado al renderer (banner UI) y

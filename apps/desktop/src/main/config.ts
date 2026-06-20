@@ -1,4 +1,5 @@
 import { app } from 'electron';
+import { randomUUID } from 'crypto';
 import { join } from 'path';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, unlinkSync } from 'fs';
 import type { AppConfig, PrinterConfig } from '../shared/types';
@@ -30,6 +31,12 @@ type StoredConfig = {
   autoLaunch?: boolean;
   scanSubnet?: string;
   printers?: PrinterConfig[];
+  /**
+   * Identificador estable de esta instalación. Se genera una sola vez y
+   * se persiste para distinguir locales en la telemetría remota
+   * (tabla desktop_heartbeat). No se borra ni se sobreescribe nunca.
+   */
+  deviceId?: string;
 };
 
 function configPath(): string {
@@ -89,6 +96,31 @@ export function saveConfig(next: AppConfig): void {
     autoLaunch:  Boolean(next.autoLaunch),
     scanSubnet:  next.scanSubnet ?? '',
     printers:    Array.isArray(next.printers) ? next.printers : [],
+    // Preservar el deviceId existente: un guardado desde Settings NO debe
+    // regenerarlo (rompería la continuidad de la telemetría del local).
+    deviceId:    current.deviceId,
   };
   writeStored(stored);
+}
+
+/**
+ * Devuelve el identificador estable de esta instalación, generándolo y
+ * persistiéndolo la primera vez. Se usa como clave en la telemetría remota
+ * (desktop_heartbeat/desktop_logs/desktop_commands). Hace merge sobre el
+ * config guardado para no pisar el resto de campos.
+ */
+export function getDeviceId(): string {
+  const stored = readStored();
+  if (typeof stored.deviceId === 'string' && stored.deviceId.length > 0) {
+    return stored.deviceId;
+  }
+  const id = randomUUID();
+  try {
+    writeStored({ ...stored, deviceId: id });
+  } catch {
+    // Si no se puede persistir (disco lleno, permisos), devolvemos el id
+    // igualmente: la telemetría funcionará en esta sesión aunque el id
+    // cambie al reiniciar.
+  }
+  return id;
 }

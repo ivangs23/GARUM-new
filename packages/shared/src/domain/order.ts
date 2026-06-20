@@ -25,4 +25,11 @@ export interface OrderItem {
 export interface Order extends Omit<OrderRow, "items" | "total_amount" | "stripe_session_id"> {
   items: OrderItem[];
   total_amount: number;
+  /**
+   * Mapa printerId (id de config del desktop) → timestamp ISO de impresiones
+   * OK (migración 017). Permite reintentar solo las impresoras que fallaron
+   * sin duplicar las que ya imprimieron. Opcional: las filas previas a la
+   * migración y los inserts del checkout no lo traen (default '{}' en la BD).
+   */
+  printed_targets?: Record<string, string> | null;
 }

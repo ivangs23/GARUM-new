@@ -6,8 +6,17 @@ import { request as httpsRequest } from 'https';
 import { request as httpRequest } from 'http';
 import { join } from 'path';
 import { updateTrayStatus } from './tray';
-import { loadConfig } from './config';
+import { loadConfig, getDeviceId } from './config';
 import { printOrder } from './printer';
+import {
+  startTelemetry,
+  stopTelemetry,
+  executeCommand,
+  type HeartbeatSnapshot,
+  type CacheDumpRow,
+  type TelemetryPrinter,
+  type DesktopCommand,
+} from './telemetry';
 import {
   IPC,
   type Order,
@@ -127,6 +136,7 @@ const nodeFetch: typeof fetch = ((input, init) => {
 let supabase: SupabaseClient | null = null;
 let channel: RealtimeChannel | null = null;
 let settingsChannel: RealtimeChannel | null = null;
+let commandsChannel: RealtimeChannel | null = null;
 
 /**
  * Cache de pedidos en memoria. Incluye:
@@ -143,11 +153,16 @@ let savedKey  = '';
 let savedWin: BrowserWindow | null = null;
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
 let midnightTimer: ReturnType<typeof setTimeout> | null = null;
-let printPollTimer: ReturnType<typeof setInterval> | null = null;
+let reconcileTimer: ReturnType<typeof setInterval> | null = null;
 let retryDelay = 5000; // ms — se duplica en cada fallo, máx 60 s
 let retryCount = 0;
-const MAX_RETRIES = 10; // tras 10 intentos fallidos deja de reconectar
-const PRINT_POLL_MS = 10_000; // safety net: cada 10 s reintentamos pedidos sin imprimir
+// Reconciliación autoritativa: cada RECONCILE_MS re-leemos la DB (vía REST,
+// independiente del WebSocket Realtime) y la fusionamos en la cache. Recupera
+// pedidos cuyo evento Realtime se perdió (red caída / reconexión sin replay) y
+// reintenta impresiones pendientes. La DB es la fuente de verdad; Realtime es
+// solo latencia baja best-effort. Sustituye al antiguo poller (que solo miraba
+// la cache y por tanto no veía un pedido cuyo evento NEW nunca llegó).
+const RECONCILE_MS = 15_000;
 
 let currentStatus: ConnectionStatus = 'connecting';
 let currentMaintenance: MaintenanceState = { enabled: false, message: '' };
@@ -272,6 +287,16 @@ export async function startRealtimeListener(
   }
   diag('autenticado como cuenta de servicio del desktop');
 
+  // Telemetría remota: heartbeat + sink de logs + canal de comandos. Reutiliza
+  // este mismo cliente autenticado. Idempotente: en reconexiones solo refresca
+  // las closures (getClient lee la `supabase` vigente).
+  startTelemetry({
+    getClient: () => supabase,
+    getSnapshot: telemetrySnapshot,
+    getCacheDump: telemetryCacheDump,
+    getPrinters: telemetryPrinters,
+  });
+
   sendStatus(win, 'connecting');
 
   // ── Carga inicial ──────────────────────────────────────────────────────────
@@ -297,7 +322,7 @@ export async function startRealtimeListener(
         retryCount = 0;
         sendStatus(win, 'connected');
         scheduleMidnightRollover(win);
-        startPrintPoller();
+        startReconciler();
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
         sendStatus(win, 'disconnected');
         scheduleReconnect();
@@ -320,12 +345,102 @@ export async function startRealtimeListener(
     .subscribe(status => {
       diag('subscribe[settings] callback: status=', status);
     });
+
+  // ── Suscripción Realtime de comandos (telemetría on-demand) ────────────────
+  // El admin inserta una fila en desktop_commands; aquí la recibimos y la
+  // ejecutamos (whitelist de solo-lectura). Filtramos por nuestro device_id
+  // para no procesar comandos de otros locales.
+  const deviceId = getDeviceId();
+  commandsChannel = supabase
+    .channel('garum_desktop_commands')
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'desktop_commands',
+        filter: `device_id=eq.${deviceId}`,
+      },
+      payload => {
+        void executeCommand(payload.new as DesktopCommand);
+      },
+    )
+    .subscribe(status => {
+      diag('subscribe[commands] callback: status=', status);
+    });
+
+  // Drenar comandos que llegaron mientras estábamos desconectados/cerrados.
+  void drainPendingCommands();
+}
+
+// ─── Telemetría: estado y comandos ────────────────────────────────────────────
+
+function telemetrySnapshot(): HeartbeatSnapshot {
+  let unprinted = 0;
+  let pending = 0;
+  for (const o of orders.values()) {
+    const stillPending =
+      o.staff_status_kitchen === 'pending' || o.staff_status_bar === 'pending';
+    if (stillPending) {
+      pending++;
+      if (o.printed_at == null) unprinted++;
+    }
+  }
+  return {
+    connection_status: currentStatus,
+    retry_count: retryCount,
+    cache_size: orders.size,
+    unprinted_count: unprinted,
+    pending_count: pending,
+  };
+}
+
+function telemetryCacheDump(): CacheDumpRow[] {
+  return [...orders.values()].map(o => ({
+    id: o.id,
+    table_number: o.table_number,
+    payment_status: o.payment_status,
+    staff_status_kitchen: o.staff_status_kitchen,
+    staff_status_bar: o.staff_status_bar,
+    printed_at: o.printed_at,
+    created_at: o.created_at,
+  }));
+}
+
+function telemetryPrinters(): TelemetryPrinter[] {
+  const { printers } = loadConfig();
+  return printers.map(p => ({
+    label: p.label,
+    destination: p.destination,
+    adapter: p.adapter,
+    host: p.host,
+    port: p.port,
+    printerName: p.printerName,
+  }));
+}
+
+async function drainPendingCommands(): Promise<void> {
+  if (!supabase) return;
+  try {
+    const deviceId = getDeviceId();
+    const { data } = await supabase
+      .from('desktop_commands')
+      .select('*')
+      .eq('device_id', deviceId)
+      .eq('status', 'pending');
+    for (const cmd of (data ?? []) as DesktopCommand[]) {
+      void executeCommand(cmd);
+    }
+  } catch (e) {
+    diag('drainPendingCommands error:', e instanceof Error ? e.message : String(e));
+  }
 }
 
 export async function stopRealtimeListener(): Promise<void> {
   cancelReconnect();
   if (midnightTimer) { clearTimeout(midnightTimer); midnightTimer = null; }
-  stopPrintPoller();
+  stopReconciler();
+  stopTelemetry();
   await teardownChannels();
   supabase    = null;
   savedUrl    = '';
@@ -344,6 +459,10 @@ async function teardownChannels(): Promise<void> {
     try { await supabase.removeChannel(settingsChannel); } catch { /* ignorar */ }
   }
   settingsChannel = null;
+  if (commandsChannel && supabase) {
+    try { await supabase.removeChannel(commandsChannel); } catch { /* ignorar */ }
+  }
+  commandsChannel = null;
 }
 
 /**
@@ -362,31 +481,40 @@ export async function reconnect(win: BrowserWindow): Promise<void> {
 
 // ─── Carga de datos ──────────────────────────────────────────────────────────
 
-async function loadInitialOrders(win: BrowserWindow): Promise<void> {
-  if (!supabase) return;
+/**
+ * Conjunto autoritativo de pedidos que deben estar en el panel, leído de la
+ * DB vía REST (NO depende del WebSocket Realtime): paid de hoy + paid de días
+ * anteriores que sigan pendientes en algún destino (no servidos). Compartido
+ * por la carga inicial y por el reconciliador.
+ */
+async function fetchAuthoritative(): Promise<Order[]> {
   const startToday = startOfTodayMadridIso();
-  diag('fetch inicial: query desde', startToday);
-
-  // 1) pedidos paid de hoy (paginado por seguridad)
   const todays = await fetchPaged(
     q => q.eq('payment_status', 'paid').gte('created_at', startToday),
   );
-  // 2) pedidos pendientes de días anteriores (no servidos)
   const stalePending = await fetchPaged(
     q => q
       .eq('payment_status', 'paid')
       .lt('created_at', startToday)
       .or('staff_status_kitchen.eq.pending,staff_status_bar.eq.pending'),
   );
+  return [...todays, ...stalePending];
+}
+
+async function loadInitialOrders(win: BrowserWindow): Promise<void> {
+  if (!supabase) return;
+  diag('fetch inicial: query desde', startOfTodayMadridIso());
+
+  const all = await fetchAuthoritative();
 
   orders.clear();
-  [...todays, ...stalePending].forEach(o => orders.set(o.id, o));
+  all.forEach(o => orders.set(o.id, o));
   diag('cache poblado con', orders.size, 'pedidos. Enviando ORDERS_INIT.');
   win.webContents.send(IPC.ORDERS_INIT, [...orders.values()]);
 
-  // 3) imprimir lo que aún no se imprimió (caso "se reabrió la app
-  //    después de que llegara el pedido"). printed_at IS NULL.
-  const unprinted = todays.filter(o => o.printed_at == null);
+  // Imprimir lo que aún no se imprimió (caso "se reabrió la app después de
+  // que llegara el pedido"). printed_at IS NULL, solo pedidos de hoy.
+  const unprinted = all.filter(o => o.printed_at == null && isToday(o.created_at));
   if (unprinted.length > 0) {
     diag('arrancando impresión de', unprinted.length, 'pedidos no impresos');
     void reprintMissed(unprinted);
@@ -455,13 +583,15 @@ async function loadMaintenance(win: BrowserWindow): Promise<void> {
 
 function scheduleReconnect(): void {
   if (retryTimer || !savedUrl || !savedWin) return;
-  if (retryCount >= MAX_RETRIES) {
-    diag('[Realtime] Máximo de reintentos alcanzado. Conexión abandonada.');
-    sendStatus(savedWin, 'disconnected');
-    return;
-  }
+  // Reconexión PERSISTENTE: nunca se abandona. Antes parábamos tras 10
+  // intentos (~6 min) y la app quedaba muerta hasta reiniciar — cualquier
+  // pedido durante esa ventana se perdía. Ahora seguimos reintentando con
+  // backoff hasta tope de 60 s indefinidamente. Además, el reconciliador
+  // (REST, independiente del WS) sigue recuperando pedidos aunque el canal
+  // Realtime esté caído, así que la pérdida queda acotada al peor caso de
+  // RECONCILE_MS de retraso.
   retryCount++;
-  diag(`[Realtime] Reintento ${retryCount}/${MAX_RETRIES} en ${retryDelay / 1000}s…`);
+  diag(`[Realtime] Reintento ${retryCount} en ${retryDelay / 1000}s… (reconexión persistente)`);
   retryTimer = setTimeout(async () => {
     retryTimer = null;
     if (!savedWin || savedWin.isDestroyed() || !savedUrl) return;
@@ -532,64 +662,163 @@ const inFlightPrints = new Set<string>();
 async function reservePrintAndDispatch(order: Order): Promise<void> {
   if (!supabase) return;
   // Dedup en memoria: si ya hay un job vivo para este order, no lanzamos
-  // otro. Cubre el caso poller-vs-handleChange en el mismo proceso.
+  // otro. Cubre el caso reconciliador-vs-handleChange en el mismo proceso.
   if (inFlightPrints.has(order.id)) return;
-  // Dedup leve en DB: si el order ya viene con printed_at no-null desde
-  // Realtime/cache, asumimos que se imprimió y salimos. Multi-instancia
-  // exacta no es un caso real para este cliente; mejor evitar duplicados
-  // que pelear con races.
+  // Totalmente impreso (todas las impresoras OK) → nada que hacer.
   if (order.printed_at != null) return;
 
-  const { printers } = loadConfig();
-  if (printers.length === 0) {
+  const allPrinters = loadConfig().printers;
+  if (allPrinters.length === 0) {
     diag('[Realtime] reservePrint: sin impresoras configuradas (loadConfig vacía).');
+    return;
+  }
+
+  // ── Idempotencia POR IMPRESORA (H4) ──────────────────────────────────────
+  // Solo intentamos las impresoras que aún NO imprimieron OK este pedido
+  // (no están en printed_targets). Así un fallo de barra NO reimprime cocina
+  // en cada ciclo del reconciliador: cocina ya consta y se salta.
+  const done = (order.printed_targets ?? {}) as Record<string, string>;
+  const pending = allPrinters.filter(p => !done[p.id]);
+
+  if (pending.length === 0) {
+    // Todas constan impresas pero printed_at sin fijar (se cayó el último
+    // UPDATE) → consolidamos printed_at de forma idempotente.
+    const nowIso = new Date().toISOString();
+    await supabase.from('orders')
+      .update({ printed_at: nowIso })
+      .eq('id', order.id)
+      .is('printed_at', null);
+    const cached = orders.get(order.id);
+    if (cached) orders.set(order.id, { ...cached, printed_at: nowIso });
     return;
   }
 
   inFlightPrints.add(order.id);
   try {
-    const failures = await printOrder(order, printers);
+    const results = await printOrder(order, pending);
+    const okIds  = results.filter(r => r.ok).map(r => r.id);
+    const failed = results.filter(r => !r.ok);
 
-    if (failures.length === 0) {
-      // Print OK → marcamos printed_at AHORA (no antes). Si la UPDATE
-      // falla, el poller lo reintentará la próxima vuelta (printed_at
-      // sigue NULL en cache y DB).
-      const { error: markErr } = await supabase
+    if (okIds.length > 0) {
+      // Registramos las impresoras OK en printed_targets (merge). Si con esto
+      // están TODAS las configuradas, fijamos también printed_at.
+      const nowIso = new Date().toISOString();
+      const nextTargets: Record<string, string> = { ...done };
+      for (const id of okIds) nextTargets[id] = nowIso;
+      const fullyPrinted = allPrinters.every(p => nextTargets[p.id]);
+
+      const patch: { printed_targets: Record<string, string>; printed_at?: string } = {
+        printed_targets: nextTargets,
+      };
+      if (fullyPrinted) patch.printed_at = nowIso;
+
+      const { error: updErr } = await supabase
         .from('orders')
-        .update({ printed_at: new Date().toISOString() })
+        .update(patch)
         .eq('id', order.id);
-      if (markErr) {
-        diag(`[Realtime] error marcando printed_at orden ${order.id}: ${markErr.message}`);
-        return;
+      if (updErr) {
+        diag(`[Realtime] error guardando printed_targets orden ${order.id}: ${updErr.message}`);
+        // Fallback defensivo: si la columna printed_targets aún no existe
+        // (migración 017 sin aplicar), al menos fijamos printed_at en una
+        // impresión COMPLETA para no caer en reimpresión en bucle. Degrada al
+        // comportamiento previo a H4 (sin granularidad por impresora) en lugar
+        // de romperse.
+        if (fullyPrinted) {
+          const { error: fbErr } = await supabase
+            .from('orders')
+            .update({ printed_at: nowIso })
+            .eq('id', order.id)
+            .is('printed_at', null);
+          if (!fbErr) {
+            const cached = orders.get(order.id);
+            if (cached) orders.set(order.id, { ...cached, printed_at: nowIso });
+          }
+        }
+      } else {
+        const cached = orders.get(order.id);
+        if (cached) orders.set(order.id, { ...cached, ...patch });
       }
-      const cached = orders.get(order.id);
-      if (cached) orders.set(order.id, { ...cached, printed_at: new Date().toISOString() });
-      return;
     }
 
-    // Print falló — el poller volverá a intentarlo. NO marcamos printed_at.
-    savedWin?.webContents.send(IPC.PRINT_ERROR, {
-      orderId: order.id,
-      mesa: order.table_number,
-      reason: failures.map(f => `${f.label}: ${f.reason}`).join(' · '),
-    });
+    if (failed.length > 0) {
+      // NO fijamos printed_at. El reconciliador reintentará SOLO las fallidas
+      // (las OK ya están en printed_targets), sin duplicar la impresora sana.
+      diag(
+        `[Realtime] impresión parcial orden ${order.id} mesa ${order.table_number}: ` +
+        `OK=[${okIds.join(',')}] FALLO=[${failed.map(f => f.label).join(',')}]`,
+      );
+      savedWin?.webContents.send(IPC.PRINT_ERROR, {
+        orderId: order.id,
+        mesa: order.table_number,
+        reason: failed.map(f => `${f.label}: ${f.reason}`).join(' · '),
+      });
+    }
   } finally {
     inFlightPrints.delete(order.id);
   }
 }
 
-// ─── Polling fallback (impresión) ─────────────────────────────────────────────
+// ─── Reconciliación autoritativa ──────────────────────────────────────────────
 //
-// Cada PRINT_POLL_MS revisamos la cache: pedidos con algún destino pendiente
-// y `printed_at IS NULL` se reenvían a `reservePrintAndDispatch`. Cubre:
-//   - Carrera entre `handleChange` y la reserva en DB (otra instancia).
-//   - Liberaciones de printed_at tras fallo de impresora intermitente.
-//   - Eventos Realtime perdidos (red caída + reconexión sin replay).
+// Cada RECONCILE_MS:
+//   1) Re-leemos la DB vía REST (independiente del WebSocket). Esto FUNCIONA
+//      aunque el canal Realtime esté caído/reconectando — REST y WS son
+//      transportes separados en Supabase.
+//   2) Fusionamos en la cache:
+//        · pedido en DB que NO está en cache → evento Realtime perdido:
+//          lo añadimos, avisamos a la UI (ORDERS_NEW) y lo registramos como
+//          BACKFILL_RECOVERED (métrica de cuántos eventos se pierden).
+//        · pedido conocido cuyo printed_at/estado cambió → refrescamos (cubre
+//          un UPDATE perdido, p.ej. otro staff marcó listo).
+//   3) Reintentamos impresión de todo lo pendiente sin imprimir (idempotente
+//      vía inFlightPrints + printed_at). Cubre también la impresora intermitente.
+//
+// Sustituye al antiguo poller, que solo recorría la cache y por tanto era ciego
+// a un pedido cuyo evento NEW nunca llegó (la causa raíz de "no entra el pedido").
 
-function startPrintPoller(): void {
-  if (printPollTimer) return;
-  printPollTimer = setInterval(() => {
-    if (!savedWin || savedWin.isDestroyed()) return;
+let reconcileRunning = false;
+
+async function reconcile(): Promise<void> {
+  if (!supabase || !savedWin || savedWin.isDestroyed()) return;
+  if (reconcileRunning) return; // evita solaparse si una vuelta tarda > RECONCILE_MS
+  reconcileRunning = true;
+  try {
+    let authoritative: Order[];
+    try {
+      authoritative = await fetchAuthoritative();
+    } catch (e) {
+      diag('[Reconcile] fetch error:', e instanceof Error ? e.message : String(e));
+      return;
+    }
+
+    for (const o of authoritative) {
+      const known = orders.get(o.id);
+      if (!known) {
+        // Evento Realtime perdido → recuperado por la DB.
+        orders.set(o.id, o);
+        savedWin.webContents.send(IPC.ORDERS_NEW, o);
+        const stillPending =
+          o.staff_status_kitchen === 'pending' || o.staff_status_bar === 'pending';
+        const ageS = Math.round((Date.now() - new Date(o.created_at).getTime()) / 1000);
+        diag(
+          `[Reconcile] BACKFILL_RECOVERED order ${o.id} mesa ${o.table_number} ` +
+          `printed=${o.printed_at != null} pending=${stillPending} edad=${ageS}s ` +
+          `— evento Realtime perdido, recuperado por reconciliación`,
+        );
+      } else if (
+        known.printed_at !== o.printed_at ||
+        known.staff_status_kitchen !== o.staff_status_kitchen ||
+        known.staff_status_bar !== o.staff_status_bar ||
+        known.payment_status !== o.payment_status
+      ) {
+        // UPDATE perdido → refrescamos campos relevantes y la UI.
+        const merged = { ...known, ...o };
+        orders.set(o.id, merged);
+        savedWin.webContents.send(IPC.ORDERS_NEW, merged);
+      }
+    }
+
+    // Reintento de impresión (idempotente).
     const { printers } = loadConfig();
     if (printers.length === 0) return;
     for (const order of orders.values()) {
@@ -599,16 +828,22 @@ function startPrintPoller(): void {
         order.staff_status_bar === 'pending';
       if (!stillPending) continue;
       if (inFlightPrints.has(order.id)) continue;
-      diag(`[Realtime] poll-retry print orden ${order.id} mesa ${order.table_number}`);
       void reservePrintAndDispatch(order);
     }
-  }, PRINT_POLL_MS);
+  } finally {
+    reconcileRunning = false;
+  }
 }
 
-function stopPrintPoller(): void {
-  if (printPollTimer) {
-    clearInterval(printPollTimer);
-    printPollTimer = null;
+function startReconciler(): void {
+  if (reconcileTimer) return;
+  reconcileTimer = setInterval(() => { void reconcile(); }, RECONCILE_MS);
+}
+
+function stopReconciler(): void {
+  if (reconcileTimer) {
+    clearInterval(reconcileTimer);
+    reconcileTimer = null;
   }
 }
 
