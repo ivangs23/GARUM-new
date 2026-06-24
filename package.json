@@ -21,6 +21,7 @@
     "desktop:release:major": "node scripts/release-desktop.mjs major",
     "seed:test-orders": "node scripts/seed-test-orders.mjs",
     "seed:one-mixed": "node scripts/seed-one-mixed-order.mjs",
+    "test:order": "node scripts/test-order.mjs",
     "prepare": "husky"
   },
   "devDependencies": {
