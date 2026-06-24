@@ -14,7 +14,11 @@ export type { Product, Category, ProductExtra } from '@garum/shared/domain';
  */
 export type StaffSubStatus = 'pending' | 'done' | 'na';
 
-export type PrinterAdapter = 'escpos-tcp' | 'escpos-usb' | 'windows';
+// 'windows'        → RAW ESC/POS por winspool (térmicas instaladas en Windows)
+// 'windows-driver' → documento de texto por el driver/GDI (Out-Printer).
+//                    Para PROBAR en impresoras NO térmicas (láser/inkjet).
+//                    No usar en producción con térmicas.
+export type PrinterAdapter = 'escpos-tcp' | 'escpos-usb' | 'windows' | 'windows-driver';
 
 export type PrinterConfig = {
   id: string;

@@ -24,7 +24,9 @@ export type PrintResult = { id: string; label: string; ok: boolean; reason?: str
 const printerQueues = new Map<string, Promise<unknown>>();
 
 function deviceKey(p: PrinterConfig): string {
-  if (p.adapter === 'windows') return `win::${p.printerName ?? p.label}`;
+  if (p.adapter === 'windows' || p.adapter === 'windows-driver') {
+    return `win::${p.printerName ?? p.label}`;
+  }
   return `tcp::${p.host ?? ''}:${p.port ?? 9100}`;
 }
 

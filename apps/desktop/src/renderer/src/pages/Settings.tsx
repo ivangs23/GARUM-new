@@ -387,6 +387,7 @@ function PrinterRow({
             onChange={e => set('adapter', e.target.value as PrinterConfig['adapter'])}>
             <option value="escpos-tcp">Red / TCP (ESC/POS)</option>
             <option value="windows">Controlador Windows</option>
+            <option value="windows-driver">Impresora normal (driver / pruebas)</option>
           </select>
         </Field>
       </div>
@@ -407,8 +408,14 @@ function PrinterRow({
         </div>
       )}
 
-      {printer.adapter === 'windows' && (
-        <Field label="Nombre de impresora (Windows)">
+      {(printer.adapter === 'windows' || printer.adapter === 'windows-driver') && (
+        <Field
+          label={
+            printer.adapter === 'windows-driver'
+              ? 'Nombre de impresora (driver / láser, solo pruebas)'
+              : 'Nombre de impresora (Windows)'
+          }
+        >
           <input style={inputStyle} placeholder="EPSON TM-T20III"
             value={printer.printerName ?? ''}
             onChange={e => set('printerName', e.target.value)} />

@@ -109,7 +109,91 @@ export async function printOrderTicket(
   if (printerConfig.adapter === 'windows') {
     return printWindowsTicket(order, printerConfig);
   }
+  if (printerConfig.adapter === 'windows-driver') {
+    return printDriverTicket(order, printerConfig);
+  }
   return printThermalTicket(order, printerConfig);
+}
+
+// ─── Impresión por DRIVER de Windows (documento de texto, GDI) ────────────────
+// Para impresoras NO térmicas (láser / inkjet). Pensado para PODER PROBAR el
+// flujo en una oficina sin térmica: en lugar de mandar ESC/POS RAW (que una
+// láser no entiende y descarta, dejando el trabajo en "Impreso" sin papel),
+// renderiza el ticket como texto plano y lo imprime con `Out-Printer`, que pasa
+// por el driver y rasteriza en cualquier impresora.
+//
+// NO usar en producción con térmicas: ahí van 'escpos-tcp' (red) o 'windows'
+// (RAW). Este modo ignora cortes/negritas/tamaños ESC/POS; solo saca el texto.
+async function printDriverTicket(order: Order, config: PrinterConfig): Promise<void> {
+  const printerName = config.printerName;
+  if (!printerName) {
+    throw new Error(`Impresora "${config.label}" sin nombre Windows configurado.`);
+  }
+
+  const destination = config.destination as TicketDestination;
+  const lines = buildTicketLines(order, destination);
+
+  const hasItemLines = lines.some(l => l.kind === 'text' && /^\d+x  /.test(l.text));
+  if (!hasItemLines) {
+    diag(`[Printer] skip "${printerName}" (driver) — sin items para destino ${destination}`);
+    return;
+  }
+
+  const text = linesToPlainText(lines);
+  const stamp = Date.now();
+  const tmpTxt = join(tmpdir(), `garum_${stamp}.txt`);
+  // BOM UTF-8 para que Out-Printer respete los acentos.
+  writeFileSync(tmpTxt, '﻿' + text, { encoding: 'utf8' });
+
+  const safeName = printerName.replace(/'/g, "''");
+  const safePath = tmpTxt.replace(/'/g, "''");
+  try {
+    diag(
+      `[Printer] (driver) enviando a "${printerName}" — orden ${order.id} mesa ${order.table_number}`,
+    );
+    await execAsync(
+      `powershell -NoProfile -Command "Get-Content -LiteralPath '${safePath}' -Raw | Out-Printer -Name '${safeName}'"`,
+      { timeout: 20000 },
+    );
+    diag(`[Printer] (driver) OK "${printerName}" — orden ${order.id} mesa ${order.table_number}`);
+  } catch (err) {
+    const detail = extractExecError(err);
+    throw new Error(`No se pudo imprimir por driver en "${printerName}". ${detail}`);
+  } finally {
+    try { unlinkSync(tmpTxt); } catch { /* ignorar */ }
+  }
+}
+
+// Convierte las líneas del ticket a texto plano legible en A4. Centra cabeceras,
+// pone divisores con guiones y descarta el comando de corte (la láser expulsa
+// la página al terminar el trabajo).
+function linesToPlainText(lines: TicketLine[]): string {
+  const WIDTH = 42;
+  const out: string[] = [];
+  for (const line of lines) {
+    switch (line.kind) {
+      case 'text': {
+        let t = line.text;
+        if (line.size === 2) t = t.toUpperCase();
+        if (line.align === 'center') {
+          const pad = Math.max(0, Math.floor((WIDTH - t.length) / 2));
+          t = ' '.repeat(pad) + t;
+        }
+        out.push(t);
+        break;
+      }
+      case 'divider':
+        out.push('-'.repeat(WIDTH));
+        break;
+      case 'newline':
+        out.push('');
+        break;
+      case 'cut':
+        // Sin equivalente en papel A4; el driver expulsa la página al final.
+        break;
+    }
+  }
+  return out.join('\r\n') + '\r\n';
 }
 
 // ─── Impresión via controlador Windows (ESC/POS RAW) ──────────────────────────
