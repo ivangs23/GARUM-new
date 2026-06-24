@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
-import { supabaseAdmin } from "@/lib/supabase-admin";
 import { headers } from "next/headers";
 import { requireServerEnv } from "@/lib/env";
+import { markPaid } from "@/lib/mark-paid";
 
 const stripe = new Stripe(requireServerEnv("STRIPE_SECRET_KEY"), {
   apiVersion: "2026-04-22.dahlia",
@@ -10,78 +10,15 @@ const stripe = new Stripe(requireServerEnv("STRIPE_SECRET_KEY"), {
 const STRIPE_WEBHOOK_SECRET = requireServerEnv("STRIPE_WEBHOOK_SECRET");
 
 /**
- * Marca un pedido como pagado de forma idempotente.
+ * Webhook de Stripe. Camino de RESPALDO para marcar pedidos como pagados.
  *
- * Caso normal: la fila estaba en `pending`. Hacemos un UPDATE atómico que
- * solo dispara si sigue así, lo que protege ante reintentos del webhook.
- *
- * Caso degradado: la fila quedó en `cancelled` porque el cleanup de
- * `/api/checkout` o `/api/payment-intent` llegó antes de que Stripe
- * cobrara. Si Stripe nos confirma el pago, lo reactivamos con un log
- * explícito (lo deseable es que esto pase muy pocas veces; si pasa a
- * menudo hay que bajar más el timeout de cleanup).
- *
- * Nota: NO reescribimos `stripe_session_id` aquí. Se asignó al crear
- * el PaymentIntent / Checkout Session y debe quedar inmutable para
- * que la columna UNIQUE no genere conflictos cruzados.
+ * El camino principal es `/api/confirm-payment`, que el cliente invoca al
+ * confirmarse el pago para que el pedido se imprima al instante (como en
+ * Manuela). Este webhook cubre los casos en que ese camino no se ejecutó
+ * (cliente cerró el navegador, flujos con redirección como Bizum/Klarna,
+ * etc.). La lógica de marcado vive en `lib/mark-paid.ts` y es idempotente,
+ * así que da igual cuál de los dos llegue primero.
  */
-type PaidOrder = {
-  id: string;
-  table_number: number | null;
-  total_amount: number | null;
-};
-
-async function markPaid(orderId: string, stripeRef: string, stripeAmountCents: number) {
-  // 1) Leer estado actual para verificar importe antes de actualizar
-  const { data: current } = await supabaseAdmin
-    .from("orders")
-    .select("id, payment_status, table_number, total_amount")
-    .eq("id", orderId)
-    .maybeSingle();
-
-  if (!current) {
-    console.warn(`Webhook: pedido ${orderId} no existe (ref=${stripeRef}).`);
-    return { ok: true as const, order: null };
-  }
-
-  // Verificar que el importe cobrado por Stripe coincide con el de la BD.
-  // Tolerancia de 1 céntimo por redondeo de floats.
-  const expectedCents = Math.round((current.total_amount ?? 0) * 100);
-  if (Math.abs(stripeAmountCents - expectedCents) > 1) {
-    console.error(
-      `Webhook: importe no coincide — Stripe=${stripeAmountCents}c DB=${expectedCents}c order=${orderId}. Rechazado.`
-    );
-    return { ok: false as const };
-  }
-
-  if (current.payment_status === "paid") {
-    return { ok: true as const, order: null }; // idempotente
-  }
-
-  // 2) UPDATE atómico — acepta pending o cancelled (cleanup llegó antes que Stripe)
-  const reactivating = current.payment_status === "cancelled";
-  if (reactivating) {
-    console.warn(`⚠ Webhook: reactivando pedido ${orderId} cancelado (ref=${stripeRef}).`);
-  }
-
-  const { data: updated, error } = await supabaseAdmin
-    .from("orders")
-    .update({ payment_status: "paid" })
-    .eq("id", orderId)
-    .in("payment_status", ["pending", "cancelled"])
-    .select("id, table_number, total_amount");
-
-  if (error) {
-    console.error("Error actualizando pedido:", error);
-    return { ok: false as const };
-  }
-
-  if (updated && updated.length > 0) {
-    return { ok: true as const, order: updated[0] as PaidOrder, reactivated: reactivating };
-  }
-
-  return { ok: true as const, order: null };
-}
 
 export async function POST(req: Request) {
   const body = await req.text();

@@ -36,6 +36,27 @@ function SuccessContent() {
     clearCart();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Camino caliente para pagos CON REDIRECCIÓN (Bizum, Klarna...). En esos
+  // flujos confirmPayment no vuelve inline en el diálogo: Stripe redirige
+  // aquí añadiendo el parámetro payment_intent a la URL. Lo usamos para
+  // marcar el pedido como paid al instante (verificado en el servidor contra
+  // Stripe), igual que hace el diálogo en los pagos inline. Best-effort: si
+  // falla, el webhook es el respaldo idempotente.
+  useEffect(() => {
+    const paymentIntentId = searchParams.get("payment_intent");
+    const redirectStatus = searchParams.get("redirect_status");
+    if (!paymentIntentId) return;
+    if (redirectStatus && redirectStatus !== "succeeded") return;
+    fetch("/api/confirm-payment", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ paymentIntentId }),
+      keepalive: true,
+    }).catch(() => {
+      /* silencioso: el webhook marca el pedido como respaldo */
+    });
+  }, [searchParams]);
+
   const { items: orderItems, total: orderTotal } = snapshot;
 
   return (

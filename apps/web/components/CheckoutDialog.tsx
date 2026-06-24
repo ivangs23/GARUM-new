@@ -67,6 +67,21 @@ function CheckoutForm({
     }
 
     if (paymentIntent?.status === "succeeded") {
+      // Confirmación en caliente: marcamos el pedido `paid` ya mismo en el
+      // servidor (verificado contra Stripe) para que el desktop lo imprima al
+      // instante, sin esperar al webhook. El webhook queda como respaldo.
+      // Si esta llamada falla, redirigimos igualmente: el webhook lo marcará.
+      try {
+        await fetch("/api/confirm-payment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ paymentIntentId: paymentIntent.id }),
+          keepalive: true,
+        });
+      } catch {
+        // Silencioso a propósito: el webhook es el respaldo idempotente.
+      }
+
       // Redirigimos manualmente para flujos que no han redireccionado solos.
       window.location.href = `${origin}/success?mesa=${encodeURIComponent(window.location.pathname.split("/")[1] || "1")}`;
       return;
